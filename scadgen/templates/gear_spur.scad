@@ -56,6 +56,13 @@
 // derived:
 //   - pitch_diameter: "modul * teeth"
 //   - outer_diameter: "modul * (teeth + 2)"
+// constraints:
+//   - check: "bore_diam == 0 or bore_diam < modul * (teeth - 2.5)"
+//     message: "Bore diameter ({bore_diam}mm) exceeds root circle — bore would obliterate the gear teeth"
+//     severity: error
+//   - check: "bore_diam == 0 or (modul * (teeth - 2.5) / 2 - bore_diam / 2) >= modul"
+//     message: "Hub thickness is less than one module — gear may be structurally weak"
+//     severity: warning
 // SCADGEN_META_END
 
 module gear_spur(teeth=24, modul=2, thickness=8, bore_diam=5, fn=128)

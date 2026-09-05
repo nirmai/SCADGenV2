@@ -125,12 +125,19 @@ def _cmd_generate(args: argparse.Namespace) -> None:
     if not output_path and not args.stdout:
         output_path = str(Path("generated_scad") / f"generated_{args.template or 'part'}.scad")
 
-    result = engine.generate(
-        description=args.description,
-        template_id=args.template,
-        params=params,
-        output_path="" if args.stdout else output_path,
-    )
+    from scadgen.exceptions import ConstraintViolationError
+    try:
+        result = engine.generate(
+            description=args.description,
+            template_id=args.template,
+            params=params,
+            output_path="" if args.stdout else output_path,
+        )
+    except ConstraintViolationError as e:
+        print("Geometry error:", file=sys.stderr)
+        for v in e.violations:
+            print(f"  - {v}", file=sys.stderr)
+        sys.exit(1)
 
     if args.stdout:
         print(result.scad_code)

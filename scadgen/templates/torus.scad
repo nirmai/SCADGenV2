@@ -34,6 +34,10 @@
 //     type: axial
 //     origin: [0, 0, 0]
 //     direction: [0, 0, 1]
+// constraints:
+//   - check: "major_r > minor_r"
+//     message: "Major radius ({major_r}mm) must exceed minor radius ({minor_r}mm) to avoid self-intersection"
+//     severity: error
 // SCADGEN_META_END
 
 module torus_shape(major_r=25, minor_r=6, fn=120) {

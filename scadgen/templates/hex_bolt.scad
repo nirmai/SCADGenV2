@@ -83,6 +83,13 @@
 //     origin: [0, 0, 0]
 //     direction: [0, 0, -1]
 //     diameter_ref: shaft_diam
+// constraints:
+//   - check: "thread_len <= shaft_len"
+//     message: "Thread length ({thread_len}mm) exceeds shaft length ({shaft_len}mm)"
+//     severity: error
+//   - check: "head_flat > shaft_diam"
+//     message: "Head across-flats ({head_flat}mm) must exceed shaft diameter ({shaft_diam}mm)"
+//     severity: error
 // SCADGEN_META_END
 
 module hex_bolt(shaft_diam=8, shaft_len=30, head_flat=13, head_height=6,

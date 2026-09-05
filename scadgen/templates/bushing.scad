@@ -40,6 +40,13 @@
 //     origin: [0, 0, 0]
 //     direction: [0, 0, 1]
 //     diameter_ref: outer_d
+// constraints:
+//   - check: "outer_d > inner_d"
+//     message: "Outer diameter ({outer_d}mm) must exceed inner diameter ({inner_d}mm)"
+//     severity: error
+//   - check: "(outer_d - inner_d) / 2 >= 1.0"
+//     message: "Wall thickness is below 1mm minimum (outer_d={outer_d}mm, inner_d={inner_d}mm)"
+//     severity: warning
 // SCADGEN_META_END
 
 module bushing(inner_d=10, outer_d=20, thickness=8) {

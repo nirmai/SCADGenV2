@@ -44,6 +44,13 @@ class ParameterDef:
 
 
 @dataclass
+class ConstraintDef:
+    check: str        # Python expression evaluated against params; True = OK
+    message: str      # Format string with {param_name} placeholders
+    severity: str     # "error" or "warning"
+
+
+@dataclass
 class ConnectorDef:
     name: str
     type: str  # "axial", "planar", "threaded", "snap"
@@ -66,6 +73,7 @@ class Template:
     source_code: str = ""
     aliases: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
+    constraints: list[ConstraintDef] = field(default_factory=list)
 
     def validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
         validated = {}

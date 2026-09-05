@@ -28,3 +28,9 @@ class ExtractionError(SCADGenError):
 
 class RenderError(SCADGenError):
     pass
+
+
+class ConstraintViolationError(SCADGenError):
+    def __init__(self, violations: list[str]):
+        self.violations = violations
+        super().__init__("Constraint violations:\n" + "\n".join(f"  - {v}" for v in violations))

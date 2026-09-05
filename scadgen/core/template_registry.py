@@ -7,7 +7,7 @@ from typing import Any
 import yaml
 
 from scadgen.exceptions import TemplateNotFoundError, TemplateParseError
-from scadgen.types import ConnectorDef, ParameterDef, Template
+from scadgen.types import ConnectorDef, ConstraintDef, ParameterDef, Template
 
 _META_PATTERN = re.compile(
     r"//\s*SCADGEN_META_BEGIN\s*\n(.*?)//\s*SCADGEN_META_END",
@@ -108,6 +108,16 @@ class TemplateRegistry:
             if isinstance(entry, dict):
                 derived.update(entry)
 
+        constraints = []
+        for c in meta.get("constraints", []):
+            constraints.append(
+                ConstraintDef(
+                    check=c["check"],
+                    message=c.get("message", ""),
+                    severity=c.get("severity", "error"),
+                )
+            )
+
         return Template(
             template_id=meta.get("template_id", path.stem),
             file_path=str(path),
@@ -121,4 +131,5 @@ class TemplateRegistry:
             source_code=source,
             aliases=meta.get("aliases", []),
             keywords=meta.get("keywords", []),
+            constraints=constraints,
         )

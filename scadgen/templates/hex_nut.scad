@@ -75,6 +75,10 @@
 //     type: planar
 //     origin: [0, 0, 0]
 //     direction: [0, 0, -1]
+// constraints:
+//   - check: "flat > thread_diam"
+//     message: "Nut across-flats ({flat}mm) must exceed thread diameter ({thread_diam}mm)"
+//     severity: error
 // SCADGEN_META_END
 
 module hex_nut(thread_diam=8, pitch=1.25, flat=13, thickness=6.5,

@@ -64,6 +64,10 @@
 //     type: planar
 //     origin: [0, 0, 0]
 //     direction: [0, 0, -1]
+// constraints:
+//   - check: "inner_diam <= 0 or diam > inner_diam"
+//     message: "Outer diameter ({diam}mm) must exceed inner diameter ({inner_diam}mm) for tube mode"
+//     severity: error
 // SCADGEN_META_END
 
 module cylinder_shape(diam=20, height=40, center=false,

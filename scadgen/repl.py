@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from scadgen.core.engine import SCADEngine
-from scadgen.exceptions import SCADGenError
+from scadgen.exceptions import ConstraintViolationError, SCADGenError
+from scadgen.knowledge.constraints import harmonize_linked_params, validate_constraints
 
 
 class InteractiveSession:
@@ -226,6 +227,7 @@ class InteractiveSession:
         # Step 4: Let user specify changes in natural language, then ask remaining
         final_merged = dict(extracted_params)
         final_merged.update(self.overrides)
+        matched: dict[str, Any] = {}
 
         if editable:
             # Show what's still open
@@ -270,12 +272,30 @@ class InteractiveSession:
                     if answer:
                         final_merged[pdef.name] = _parse_value(answer)
 
-        # Step 5: Validate and generate
+        # Step 5: Validate, harmonize, check constraints, generate
+        user_explicit = set(self.overrides.keys())
+        user_explicit.update(matched.keys())
+
         try:
             validated = template.validate_params(final_merged)
             final_params = template.apply_defaults(validated)
+
+            final_params, link_messages = harmonize_linked_params(
+                template, final_params, user_explicit,
+            )
+
+            errors, constraint_warnings = validate_constraints(template, final_params)
+            if errors:
+                raise ConstraintViolationError(errors)
+
             scad_code = self.engine.renderer.render(template, final_params)
             derived = template.compute_derived(final_params)
+        except ConstraintViolationError as e:
+            print("\n  Geometry error:")
+            for v in e.violations:
+                print(f"    - {v}")
+            print("  Please adjust parameters.")
+            return
         except (SCADGenError, ValueError) as e:
             print(f"\n  Error: {e}")
             return
@@ -289,6 +309,7 @@ class InteractiveSession:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(scad_code, encoding="utf-8")
 
+        all_warnings = list(link_messages) + constraint_warnings
         from scadgen.types import GenerationResult
         result = GenerationResult(
             scad_code=scad_code,
@@ -296,11 +317,16 @@ class InteractiveSession:
             template=template,
             parameters=final_params,
             derived_values=derived,
+            warnings=all_warnings,
         )
         self._last_result = result
 
         # Step 7: Print result
         print()
+        for msg in link_messages:
+            print(f"  Info:      {msg}")
+        for w in constraint_warnings:
+            print(f"  Warning:   {w}")
         if derived:
             derived_str = "  ".join(f"{k}={v:.4g}" for k, v in derived.items())
             print(f"  Derived:   {derived_str}")

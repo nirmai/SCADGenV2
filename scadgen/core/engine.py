@@ -6,7 +6,8 @@ from typing import Any
 from scadgen.config import Config
 from scadgen.core.renderer import SCADRenderer
 from scadgen.core.template_registry import TemplateRegistry
-from scadgen.exceptions import SCADGenError
+from scadgen.exceptions import ConstraintViolationError, SCADGenError
+from scadgen.knowledge.constraints import harmonize_linked_params, validate_constraints
 from scadgen.knowledge.resolver import EngineeringResolver
 from scadgen.types import GenerationResult
 
@@ -44,6 +45,7 @@ class SCADEngine:
         output_path: str = "",
     ) -> GenerationResult:
         params = params or {}
+        user_explicit = set(params.keys())
 
         if description:
             extraction = self.extractor.extract(description)
@@ -57,10 +59,20 @@ class SCADEngine:
 
         validated = template.validate_params(merged)
         final_params = template.apply_defaults(validated)
+
+        final_params, link_messages = harmonize_linked_params(
+            template, final_params, user_explicit,
+        )
+
+        warnings: list[str] = list(link_messages)
+        errors, constraint_warnings = validate_constraints(template, final_params)
+        if errors:
+            raise ConstraintViolationError(errors)
+        warnings.extend(constraint_warnings)
+
         scad_code = self.renderer.render(template, final_params)
         derived = template.compute_derived(final_params)
 
-        warnings: list[str] = []
         out_path = ""
         if output_path:
             out = Path(output_path)
