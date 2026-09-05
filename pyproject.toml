@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "scadgen"
+version = "0.1.0"
+description = "AI-powered parametric OpenSCAD generator with engineering knowledge"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "nirmai", email = "nirmai.puthan@gmail.com"}]
+
+dependencies = [
+    "requests>=2.28.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0"]
+dev = ["pytest>=7.0", "ruff>=0.4"]
+
+[project.scripts]
+scadgen = "scadgen.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scadgen*"]
+
+[tool.setuptools.package-data]
+"scadgen.templates" = ["*.scad"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
