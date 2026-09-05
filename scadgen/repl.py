@@ -243,7 +243,9 @@ class InteractiveSession:
                 return
 
             if spec:
-                matched = _fuzzy_match_params(spec, [p for p, _, _ in editable])
+                # Match against ALL params (not just editable) so user can override locked values too
+                all_params = [p for p in template.parameters if p.name not in skip_display]
+                matched = _fuzzy_match_params(spec, all_params)
                 for name, val in matched.items():
                     final_merged[name] = val
 
@@ -252,7 +254,7 @@ class InteractiveSession:
                     pairs = "  ".join(f"{k}={v}" for k, v in matched.items())
                     print(f"  Updated:   {pairs}")
 
-                # Ask about anything the fuzzy match didn't cover
+                # Ask about anything the fuzzy match didn't cover (editable only)
                 unmatched = [
                     (p, v, s) for p, v, s in editable
                     if p.name not in matched
