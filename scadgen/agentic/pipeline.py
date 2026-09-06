@@ -26,14 +26,18 @@ def run_pipeline(
     image_path: str = "",
 ) -> AssemblyResult:
     """Run the full agentic assembly pipeline."""
-    provider = create_provider(engine.config)
+    provider = create_provider(engine.config, prefer_vision=bool(image_path))
     registry = engine.registry
 
     image = None
     if image_path:
         from scadgen.nlp.providers import ImageInput
         if not provider.supports_vision():
-            _log(verbose, f"  ! Provider does not support images; ignoring {image_path}")
+            _log(
+                verbose,
+                f"  ! Selected provider has no vision support; ignoring image. "
+                f"Set ANTHROPIC_API_KEY or use --provider anthropic to enable it.",
+            )
         else:
             image = ImageInput.from_path(image_path)
             _log(verbose, f"  + Using reference image: {image_path}")

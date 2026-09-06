@@ -207,7 +207,7 @@ class OpenAIProvider(LLMProvider):
         return self._client
 
 
-def create_provider(config: Config) -> LLMProvider:
+def create_provider(config: Config, prefer_vision: bool = False) -> LLMProvider:
     if config.provider == "ollama":
         return OllamaProvider(config.ollama_url, config.ollama_model)
     if config.provider == "anthropic":
@@ -219,7 +219,15 @@ def create_provider(config: Config) -> LLMProvider:
             raise ProviderUnavailableError("OPENAI_API_KEY not set")
         return OpenAIProvider(config.openai_api_key, config.openai_model)
 
-    # auto-detect: Ollama → Anthropic → OpenAI
+    # auto-detect. When a reference image is in play, prefer a cloud
+    # vision-capable provider over local Ollama (whose vision support
+    # depends on the loaded model and can't be assumed).
+    if prefer_vision:
+        if config.anthropic_api_key:
+            return AnthropicProvider(config.anthropic_api_key, config.anthropic_model)
+        if config.openai_api_key:
+            return OpenAIProvider(config.openai_api_key, config.openai_model)
+
     ollama = OllamaProvider(config.ollama_url, config.ollama_model)
     if ollama.is_available():
         return ollama
