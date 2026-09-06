@@ -18,12 +18,16 @@
 // connectors:
 //   - name: top_face
 //     type: planar
-//     origin: [0, 0, 0]
+//     origin: [0, 0, "size / 2"]
 //     direction: [0, 0, 1]
 //   - name: bottom_face
 //     type: planar
-//     origin: [0, 0, 0]
+//     origin: [0, 0, "-size / 2"]
 //     direction: [0, 0, -1]
+//   - name: side_face
+//     type: planar
+//     origin: ["size / 2", 0, 0]
+//     direction: [1, 0, 0]
 // SCADGEN_META_END
 
 module cube_shape(size=10) {

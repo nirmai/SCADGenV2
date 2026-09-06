@@ -34,6 +34,14 @@
 //     type: axial
 //     origin: [0, 0, 0]
 //     direction: [0, 0, 1]
+//   - name: top_face
+//     type: planar
+//     origin: [0, 0, "minor_r"]
+//     direction: [0, 0, 1]
+//   - name: bottom_face
+//     type: planar
+//     origin: [0, 0, "-minor_r"]
+//     direction: [0, 0, -1]
 // constraints:
 //   - check: "major_r > minor_r"
 //     message: "Major radius ({major_r}mm) must exceed minor radius ({minor_r}mm) to avoid self-intersection"

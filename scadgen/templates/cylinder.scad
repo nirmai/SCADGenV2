@@ -55,16 +55,19 @@
 // connectors:
 //   - name: center_axis
 //     type: axial
-//     origin: [0, 0, 0]
+//     origin: [0, 0, "height / 2"]
 //     direction: [0, 0, 1]
+//     diameter_ref: diam
 //   - name: top_face
 //     type: planar
-//     origin: [0, 0, 0]
+//     origin: [0, 0, "height"]
 //     direction: [0, 0, 1]
+//     diameter_ref: diam
 //   - name: bottom_face
 //     type: planar
 //     origin: [0, 0, 0]
 //     direction: [0, 0, -1]
+//     diameter_ref: diam
 // constraints:
 //   - check: "inner_diam <= 0 or diam > inner_diam"
 //     message: "Outer diameter ({diam}mm) must exceed inner diameter ({inner_diam}mm) for tube mode"

@@ -43,8 +43,18 @@
 // connectors:
 //   - name: center_axis
 //     type: axial
-//     origin: [0, 0, 0]
+//     origin: [0, 0, "height / 2"]
 //     direction: [0, 0, 1]
+//   - name: bottom_face
+//     type: planar
+//     origin: [0, 0, 0]
+//     direction: [0, 0, -1]
+//     diameter_ref: base_diam
+//   - name: top_face
+//     type: planar
+//     origin: [0, 0, "height"]
+//     direction: [0, 0, 1]
+//     diameter_ref: top_diam
 // SCADGEN_META_END
 
 module cone_shape(base_diam=30, top_diam=10, height=40, center=false, fn=96) {
