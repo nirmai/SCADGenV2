@@ -72,9 +72,19 @@ Return ONLY a JSON object with this exact structure:
 Rules:
 - "mate" means surfaces face each other (directions oppose)
 - "coaxial" means axes align (directions match)
-- The root_part sits at the origin; other parts are positioned relative to it
+- The root_part is the part that rests on the ground / holds the assembly
+  up (e.g. a base or block), NOT a part that hangs off another
+- PARAMETERS: every value in suggested_params MUST fall within the
+  [min..max] range shown for that param in the catalog. Never exceed a max
+  or go below a min.
+- CONSTRAINTS: honor every "must satisfy" expression listed under a
+  template. If it says "bottom_diam > top_diam", make bottom_diam larger.
+  If it says "curve_radius > stem_diam * 2", size them accordingly.
+- When unsure of a good value, omit the param and the template default is used
 - Use sensible engineering dimensions in mm
-- Colors use OpenSCAD color names (Silver, Goldenrod, DarkGray, etc.)
+- COLORS: give all parts of a single object the SAME color unless the
+  description calls for different ones. Use OpenSCAD color names (Silver,
+  Goldenrod, DarkGray, etc.)
 - Return ONLY the JSON, no other text"""
 
     return system, user
@@ -260,7 +270,11 @@ Return ONLY a JSON object:
 
 
 def _build_template_catalog(templates: list[Template]) -> str:
-    """Compressed template catalog for the decomposition prompt."""
+    """Compressed template catalog for the decomposition prompt.
+
+    Shows each param with its default and [min..max] range plus the
+    template's constraints, so the LLM can choose valid parameters.
+    """
     by_category: dict[str, list[Template]] = {}
     for t in templates:
         cat = t.category or "other"
@@ -271,15 +285,29 @@ def _build_template_catalog(templates: list[Template]) -> str:
         sections.append(f"\n### {cat.title()}")
         for t in sorted(by_category[cat], key=lambda x: x.template_id):
             connectors = ", ".join(c.name for c in t.connectors) or "none"
-            key_params = ", ".join(
-                f"{p.name}" for p in t.parameters if p.name != "fn"
-            )[:80]
             sections.append(
-                f"- **{t.template_id}**: {t.description} "
-                f"(params: {key_params}) [connectors: {connectors}]"
+                f"- **{t.template_id}**: {t.description} [connectors: {connectors}]"
             )
+            for p in t.parameters:
+                if p.name == "fn":
+                    continue
+                rng = ""
+                if p.min is not None and p.max is not None:
+                    rng = f" [{_num(p.min)}..{_num(p.max)}]"
+                sections.append(
+                    f"    - {p.name}={_num(p.default)}{rng}"
+                )
+            for c in t.constraints:
+                sections.append(f"    ! must satisfy: {c.check}")
 
     return "\n".join(sections)
+
+
+def _num(v: object) -> str:
+    """Format a numeric value compactly (drop trailing .0)."""
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
 
 
 def _extract_required_connectors(part: PartSpec, plan: AssemblyPlan) -> str:
