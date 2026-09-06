@@ -33,7 +33,7 @@ High-res birdcage dome:
 
 Parametric CAD is powerful but slow to author: you pick parts, set dimensions, name mounting points, and hand-position everything. SCADGen's goal is to do that end-to-end from a description — the way an engineer would sketch an assembly, but automated. The north star: *given a prompt, produce a complete multi-part assembly in OpenSCAD without human intervention.*
 
-The engine assembly is the proving ground; the architecture is general-purpose — lamps, mechanical assemblies, and novel objects all flow through the same pipeline.
+The architecture is general-purpose by design, not domain-specific: engines, lamps, and objects with no pre-built template at all (a birdcage) all flow through the same pipeline.
 
 ---
 
