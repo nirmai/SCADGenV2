@@ -194,10 +194,41 @@ String expressions ONLY go in origin fields, never in direction.
 - All parameters must have defaults matching the metadata defaults
 - Set `$fn = fn;` at the top of the module (fn is always a param)
 - Use difference() for holes, union() for joining
-- Available primitives: cube, cylinder, sphere, linear_extrude, rotate_extrude, hull
-- Available transforms: translate, rotate, scale, mirror
+- Primitives: cube, cylinder, sphere, circle, square, polygon,
+  linear_extrude, rotate_extrude, hull, minkowski
+- Transforms: translate, rotate, scale, mirror
+- Control flow: `for (i = [0 : n-1]) { ... }` loops and `if (cond) { ... }`
+  ARE available — USE THEM for any repeated or patterned geometry
 - All dimensions in mm
-- Make the geometry look professional — use chamfers, fillets, and detail features
+
+## Build the REAL structure, not a stand-in
+Do not approximate a complex object with a single primitive. If the part
+is a cage, frame, grille, rack, or anything with repeated elements, model
+those elements with a loop. Reproduce the actual shape.
+
+## Geometry Patterns (compose these)
+Radial repetition — N elements evenly around a circle (cage bars, spokes,
+bolt holes, gear teeth):
+    for (i = [0 : count - 1]) {{
+        rotate([0, 0, i * 360 / count])
+            translate([radius, 0, 0])
+                cylinder(h = height, d = bar_d);
+    }}
+
+Ring / hoop (top and bottom rails of a cage):
+    rotate_extrude() translate([radius, 0, 0]) circle(d = rail_d);
+
+Dome (rounded cage top):
+    difference() {{
+        scale([1, 1, dome_h / radius]) sphere(r = radius);
+        translate([0, 0, -radius]) cube(2 * radius, center = true);  // keep top half
+    }}
+
+Hollow shell (walls only): difference() {{ outer(); inner(); }}
+Smooth transition between two profiles: hull() {{ shapeA(); shapeB(); }}
+
+Make the geometry look professional — real proportions, chamfers where
+appropriate, and the defining features of the object actually present.
 
 ## Suggested Parameters
 {_format_suggested_params(part)}

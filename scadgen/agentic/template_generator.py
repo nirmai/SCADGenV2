@@ -123,17 +123,40 @@ class TemplateGenerator:
         if ranked:
             examples.append(self._registry.get(ranked[0][0]))
 
-        # Add a simple template as format baseline
-        for simple_id in ("cylinder", "cone", "bushing", "cube"):
-            try:
-                t = self._registry.get(simple_id)
-                if not examples or t.template_id != examples[0].template_id:
-                    examples.append(t)
-                    break
-            except Exception:
-                pass
+        # Second example: prefer one that demonstrates loop-based / repeated
+        # geometry (a `for` loop), so the model sees how to build patterned
+        # structures. Fall back to a simple format baseline.
+        chosen = examples[0] if examples else None
+        loop_example = self._first_loop_template(exclude=chosen)
+        if loop_example is not None:
+            examples.append(loop_example)
+        else:
+            for simple_id in ("cylinder", "cone", "bushing", "cube"):
+                try:
+                    t = self._registry.get(simple_id)
+                    if not examples or t.template_id != examples[0].template_id:
+                        examples.append(t)
+                        break
+                except Exception:
+                    pass
 
         return examples[:2]
+
+    def _first_loop_template(self, exclude: Template | None = None) -> Template | None:
+        """Find a template whose source uses a `for` loop, to model repetition."""
+        preferred = ("gear_spur", "gasket", "flywheel", "hex_bolt")
+        exclude_id = exclude.template_id if exclude else None
+        for tid in preferred:
+            try:
+                t = self._registry.get(tid)
+            except Exception:
+                continue
+            if t.template_id != exclude_id and "for (" in t.source_code:
+                return t
+        for t in self._registry.list_templates():
+            if t.template_id != exclude_id and "for (" in t.source_code:
+                return t
+        return None
 
     def _find_part(self, plan: AssemblyPlan, template_id: str) -> PartSpec | None:
         for p in plan.parts:
