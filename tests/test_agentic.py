@@ -310,6 +310,13 @@ class TestTemplateValidator(unittest.TestCase):
         errors = validate_template(bad)
         self.assertTrue(any("nonexistent_param" in e for e in errors))
 
+    def test_empty_body_flagged(self):
+        bad = VALID_TEMPLATE.replace(
+            "cube([width, width, height], center=true);", "x = width;",
+        )
+        errors = validate_template(bad)
+        self.assertTrue(any("no geometry" in e.lower() for e in errors))
+
 
 # ── Registry register_template tests ────────────────────────────────────
 
@@ -624,9 +631,13 @@ class TestPipelineIntegration(unittest.TestCase):
         engine = SCADEngine()
         import scadgen.agentic.pipeline as pipeline_mod
         original_create = pipeline_mod.create_provider
+        original_find = pipeline_mod.find_openscad
         # No successful template generation: 'not_defined' stays unresolved.
         provider = MockProvider([decompose_resp, "invalid scad", "invalid", "invalid"])
         pipeline_mod.create_provider = lambda cfg, prefer_vision=False: provider
+        # Stub OpenSCAD presence so the generation path runs; 'not_defined'
+        # still fails static validation and is dropped.
+        pipeline_mod.find_openscad = lambda cfg: "/fake/openscad"
 
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -642,6 +653,107 @@ class TestPipelineIntegration(unittest.TestCase):
                 self.assertIn("gasket", part_ids)
         finally:
             pipeline_mod.create_provider = original_create
+            pipeline_mod.find_openscad = original_find
+
+
+# ── Blocker 1: custom-part routing ───────────────────────────────────────
+
+
+class TestCustomRouting(unittest.TestCase):
+    def setUp(self):
+        self.engine = SCADEngine()
+
+    def test_custom_part_with_primitive_suggestion_forced_to_generation(self):
+        plan = AssemblyPlan(
+            name="cage", description="", root_part="body",
+            parts=[PartSpec("body", "A domed cage frame", "cone", custom=True)],
+        )
+        TemplateInventory(self.engine.registry).check(plan)
+        self.assertNotIn("cone", plan.templates_found)
+        self.assertTrue(plan.templates_needed)
+        self.assertNotIn(
+            plan.parts[0].suggested_template,
+            {"cube", "cylinder", "sphere", "cone", "torus"},
+        )
+
+    def test_custom_part_matching_real_template_is_used(self):
+        plan = AssemblyPlan(
+            name="t", description="", root_part="g",
+            parts=[PartSpec("g", "a gasket", "gasket", custom=True)],
+        )
+        TemplateInventory(self.engine.registry).check(plan)
+        self.assertIn("gasket", plan.templates_found)
+        self.assertEqual(plan.templates_needed, [])
+
+    def test_noncustom_part_still_fuzzy_matches(self):
+        plan = AssemblyPlan(
+            name="t", description="", root_part="b",
+            parts=[PartSpec("b", "A hex bolt fastener", "bolt", custom=False)],
+        )
+        TemplateInventory(self.engine.registry).check(plan)
+        self.assertEqual(plan.parts[0].suggested_template, "hex_bolt")
+
+
+# ── Blocker 2: part patterns ─────────────────────────────────────────────
+
+
+class TestPatterns(unittest.TestCase):
+    def _wheel_plan(self, pattern):
+        return AssemblyPlan(
+            name="wheel", description="", root_part="hub",
+            parts=[
+                PartSpec("hub", "hub", "cylinder", {"diam": 40, "height": 20}),
+                PartSpec("spoke", "spoke", "cylinder", {"diam": 6, "height": 60},
+                         pattern=pattern),
+            ],
+            connections=[
+                ConnectionSpec("hub", "top_face", "spoke", "bottom_face", "mate"),
+            ],
+        )
+
+    def test_radial_pattern_emits_loop(self):
+        ex = AssemblyExecutor(SCADEngine())
+        plan = self._wheel_plan({"type": "radial", "count": 8, "radius": 50})
+        with tempfile.TemporaryDirectory() as d:
+            r = ex.execute(plan, output_dir=d)
+            self.assertIn("for (i = [0 : 7])", r.scad_code)
+            self.assertIn("rotate([0, 0, i * 45", r.scad_code)
+            self.assertIn("translate([50, 0, 0])", r.scad_code)
+
+    def test_linear_pattern_emits_loop(self):
+        ex = AssemblyExecutor(SCADEngine())
+        plan = self._wheel_plan({"type": "linear", "count": 4, "spacing": 10, "axis": "x"})
+        with tempfile.TemporaryDirectory() as d:
+            r = ex.execute(plan, output_dir=d)
+            self.assertIn("for (i = [0 : 3])", r.scad_code)
+            self.assertIn("translate([i * 10, i * 0, i * 0])", r.scad_code)
+
+    def test_no_pattern_has_no_loop(self):
+        ex = AssemblyExecutor(SCADEngine())
+        plan = self._wheel_plan(None)
+        with tempfile.TemporaryDirectory() as d:
+            r = ex.execute(plan, output_dir=d)
+            self.assertNotIn("for (i =", r.scad_code)
+
+    def test_decomposer_parses_pattern_and_custom(self):
+        resp = json.dumps({
+            "assembly_name": "wheel", "root_part": "hub",
+            "parts": [
+                {"part_id": "hub", "description": "hub", "suggested_template": "cylinder"},
+                {"part_id": "spoke", "description": "spoke", "suggested_template": "cylinder",
+                 "pattern": {"type": "radial", "count": 8, "radius": 50}},
+                {"part_id": "frame", "description": "cage frame",
+                 "suggested_template": "cage_frame", "custom": True},
+            ],
+            "connections": [],
+        })
+        decomposer = AssemblyDecomposer(MockProvider([resp]), SCADEngine().registry)
+        plan = decomposer.decompose("a wheel")
+        by_id = {p.part_id: p for p in plan.parts}
+        self.assertEqual(by_id["spoke"].pattern["type"], "radial")
+        self.assertEqual(by_id["spoke"].pattern["count"], 8)
+        self.assertTrue(by_id["frame"].custom)
+        self.assertIsNone(by_id["hub"].pattern)
 
 
 # ── Anthropic provider tests ────────────────────────────────────────────

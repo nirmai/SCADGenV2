@@ -12,7 +12,9 @@ from scadgen.agentic.inventory import TemplateInventory
 from scadgen.agentic.template_generator import TemplateGenerator
 from scadgen.agentic.types import AssemblyResult
 from scadgen.core.engine import SCADEngine
+from scadgen.exceptions import AgenticError
 from scadgen.nlp.providers import create_provider
+from scadgen.render import find_openscad
 
 
 def run_pipeline(
@@ -83,12 +85,23 @@ def run_pipeline(
     warnings: list[str] = []
     if plan.templates_needed:
         _log(verbose, "[3/5] Generating missing templates")
+        # Generation requires OpenSCAD to render-check each new template.
+        openscad_bin = find_openscad(engine.config)
+        if openscad_bin is None:
+            raise AgenticError(
+                "This assembly needs new templates generated, which requires "
+                "OpenSCAD to validate them. OpenSCAD was not found.\n"
+                "Install it from https://openscad.org/ , or set OPENSCAD_PATH "
+                "to the openscad executable."
+            )
+        _log(verbose, f"  + OpenSCAD render-check: {openscad_bin}")
         # Generated templates are OUTPUTS, not part of the packaged template
         # library — write them under the output dir so the source stays clean.
         # They are still registered in-session, so assembly works immediately.
         template_dir = Path(output_dir) / "generated_templates"
         generator = TemplateGenerator(
             provider, registry, template_dir, max_retries=max_retries,
+            openscad_bin=openscad_bin,
         )
         generated_paths = generator.generate_missing(plan)
         for p in generated_paths:

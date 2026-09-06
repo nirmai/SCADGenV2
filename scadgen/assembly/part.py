@@ -31,3 +31,5 @@ class Part:
     parameters: dict[str, Any] = field(default_factory=dict)
     transform: Transform = field(default_factory=Transform.identity)
     connectors: dict[str, ConnectorInstance] = field(default_factory=dict)
+    # Optional render-time repetition (radial/linear); see PartSpec.pattern.
+    pattern: dict[str, Any] | None = None

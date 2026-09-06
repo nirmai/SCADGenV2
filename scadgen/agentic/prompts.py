@@ -49,17 +49,37 @@ def build_decomposition_prompt(
 "{description}"
 
 ## Instructions
-Decompose this object into individual parts. For each part:
-- Choose an existing template from the catalog if one fits
-- Otherwise INVENT a specific, descriptive new template_id (lowercase,
-  underscored) that names the actual part — e.g. "cage_body", "bird_perch",
-  "lamp_shade". This new template will be generated for you.
-- NEVER use a vague placeholder as a template name: no "primitive",
-  "part", "shape", "custom", "generic", "not_defined", "tbd", or similar.
-  Every suggested_template must be either a real catalog id or a concrete
-  new part name.
-- Set reasonable parameter values based on the description
-- Assign a functional role
+Decompose this object into individual parts. Classify each part into ONE of
+three kinds and handle it accordingly:
+
+1. BARE SOLID — the part literally is a cube, cylinder, cone, sphere, or
+   torus. Use that catalog primitive as `suggested_template`. `custom` = false.
+
+2. REPEATED SIMPLE ELEMENTS — many identical simple pieces arranged in a
+   pattern (cage bars, wheel spokes, fence pickets, bolt circle). Model ONE
+   piece with a primitive AND add a `pattern` (see "Repetition" below). Do
+   NOT create a separate part per piece. `custom` = false.
+
+3. COMPLEX SINGLE SHAPE — anything with internal structure or a form no bare
+   primitive captures (a bracket, an organic body, a housing, a domed frame).
+   INVENT a specific, descriptive new `template_id` (lowercase, underscored,
+   e.g. "cage_dome", "bird_perch") and set `custom` = true. It will be
+   generated for you.
+
+Rules for every part:
+- NEVER use a vague placeholder template name: no "primitive", "part",
+  "shape", "custom", "generic", "not_defined", "tbd". A custom part's
+  template_id must be a concrete NON-primitive name.
+- Set reasonable parameter values; assign a functional role.
+
+## Repetition (pattern)
+To array a part, add a `pattern` object instead of listing copies:
+- radial (around the vertical axis — cage bars, spokes, bolt circles):
+    "pattern": {{"type": "radial", "count": 12, "radius": 60}}
+- linear (along an axis — pickets, rungs):
+    "pattern": {{"type": "linear", "count": 5, "spacing": 20, "axis": "x"}}
+A patterned part still needs ONE connection to anchor the array to the rest
+of the assembly (e.g. the ring of bars sits on the base's top_face).
 
 Then define how the parts connect using their connector names.
 
@@ -90,7 +110,9 @@ Return ONLY a JSON object with this exact structure:
       "description": "what this part is and does",
       "suggested_template": "template_id",
       "suggested_params": {{"param": value}},
-      "role": "structural|decorative|mechanical|connector"
+      "role": "structural|decorative|mechanical|connector",
+      "custom": false,
+      "pattern": null
     }}
   ],
   "connections": [

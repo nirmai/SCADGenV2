@@ -111,9 +111,56 @@ def _positioned_parts(
         lines.append(f"translate([{_n(tx)}, {_n(ty)}, {_n(tz)}])")
         if has_rot:
             lines.append(f"rotate([{_n(rx)}, {_n(ry)}, {_n(rz)}])")
-        lines.append(f"  {call}")
+
+        pattern_prefix = _pattern_prefix(getattr(p, "pattern", None))
+        if pattern_prefix:
+            lines.append(f"  {pattern_prefix} {call}")
+        else:
+            lines.append(f"  {call}")
         lines.append("")
     return "\n".join(lines)
+
+
+def _pattern_prefix(pattern: dict[str, Any] | None) -> str:
+    """Return an OpenSCAD `for(...) <transform>` prefix that arrays a part.
+
+    The prefix wraps a single module call and is emitted inside the part's
+    solver transform, so the repetition happens in the part's local frame.
+    """
+    if not pattern:
+        return ""
+
+    ptype = str(pattern.get("type", "")).lower()
+    try:
+        count = int(pattern.get("count", 1))
+    except (TypeError, ValueError):
+        return ""
+    count = max(1, min(count, 64))
+    if count <= 1:
+        return ""
+
+    if ptype == "radial":
+        radius = _num(pattern.get("radius", 0))
+        return (
+            f"for (i = [0 : {count - 1}]) "
+            f"rotate([0, 0, i * {_n(360.0 / count)}]) "
+            f"translate([{_n(radius)}, 0, 0])"
+        )
+    if ptype == "linear":
+        spacing = _num(pattern.get("spacing", 0))
+        axis = str(pattern.get("axis", "x")).lower()
+        ax = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}.get(axis, (1, 0, 0))
+        sx, sy, sz = (_n(spacing * a) for a in ax)
+        return f"for (i = [0 : {count - 1}]) translate([i * {sx}, i * {sy}, i * {sz}])"
+
+    return ""
+
+
+def _num(v: Any) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _build_call(part: Part) -> str:

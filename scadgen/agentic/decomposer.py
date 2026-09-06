@@ -42,6 +42,8 @@ class AssemblyDecomposer:
                 suggested_template=p["suggested_template"],
                 suggested_params=p.get("suggested_params", {}),
                 role=p.get("role", "structural"),
+                custom=bool(p.get("custom", False)),
+                pattern=_clean_pattern(p.get("pattern")),
             ))
 
         connections = []
@@ -66,3 +68,35 @@ class AssemblyDecomposer:
             connections=connections,
             colors=data.get("colors", {}),
         )
+
+
+def _clean_pattern(raw: Any) -> dict[str, Any] | None:
+    """Validate and normalize an LLM-supplied repetition pattern."""
+    if not isinstance(raw, dict):
+        return None
+    ptype = str(raw.get("type", "")).lower()
+    if ptype not in ("radial", "linear"):
+        return None
+    try:
+        count = int(raw.get("count", 0))
+    except (TypeError, ValueError):
+        return None
+    if count <= 1:
+        return None
+    count = min(count, 64)
+
+    if ptype == "radial":
+        return {"type": "radial", "count": count,
+                "radius": _as_float(raw.get("radius", 0))}
+    axis = str(raw.get("axis", "x")).lower()
+    if axis not in ("x", "y", "z"):
+        axis = "x"
+    return {"type": "linear", "count": count,
+            "spacing": _as_float(raw.get("spacing", 0)), "axis": axis}
+
+
+def _as_float(v: Any) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0

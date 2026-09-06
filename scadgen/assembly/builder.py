@@ -19,6 +19,7 @@ class _PartSpec:
     template_id: str
     params: dict[str, Any]
     gen_result: GenerationResult | None = None
+    pattern: dict[str, Any] | None = None
 
 
 class AssemblyBuilder:
@@ -35,10 +36,11 @@ class AssemblyBuilder:
         part_id: str,
         template_id: str,
         params: dict[str, Any] | None = None,
+        pattern: dict[str, Any] | None = None,
     ) -> None:
         if part_id in self._specs:
             raise ValueError(f"Duplicate part_id: '{part_id}'")
-        self._specs[part_id] = _PartSpec(template_id, params or {})
+        self._specs[part_id] = _PartSpec(template_id, params or {}, pattern=pattern)
 
     def connect(
         self,
@@ -77,6 +79,7 @@ class AssemblyBuilder:
                 part_id=part_id,
                 template=result.template,
                 parameters=result.parameters,
+                pattern=spec.pattern,
             )
             assembly.add_part(part)
 

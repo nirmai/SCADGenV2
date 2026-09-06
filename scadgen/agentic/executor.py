@@ -162,6 +162,7 @@ class AssemblyExecutor:
                 part_id=part.part_id,
                 template_id=part.suggested_template,
                 params=part.suggested_params,
+                pattern=part.pattern,
             )
         builder.set_root(plan.root_part)
         for color_part, color_name in _clean_colors(plan.colors).items():

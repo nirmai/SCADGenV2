@@ -14,6 +14,14 @@ _META_PATTERN = re.compile(
 
 _MODULE_PATTERN = re.compile(r"module\s+(\w+)\s*\(")
 
+# Any OpenSCAD construct that yields geometry — used to reject empty bodies.
+_GEOMETRY_PATTERN = re.compile(
+    r"\b(cube|cylinder|sphere|polyhedron|circle|square|polygon|text|surface|"
+    r"import|linear_extrude|rotate_extrude|hull|minkowski|offset|union|"
+    r"difference|intersection|translate|rotate|scale|mirror|resize|color|"
+    r"children)\s*\("
+)
+
 
 def validate_template(source: str) -> list[str]:
     """Validate a generated .scad template. Returns a list of error messages (empty = valid)."""
@@ -66,6 +74,13 @@ def validate_template(source: str) -> list[str]:
         errors.append(
             f"Module name mismatch: YAML says '{module_name}', "
             f"code defines '{module_match.group(1)}'"
+        )
+
+    # 4b. Body must actually produce geometry (cheap pre-filter before render)
+    body = source[match.end():]  # everything after SCADGEN_META_END
+    if not _GEOMETRY_PATTERN.search(body):
+        errors.append(
+            "Module body produces no geometry (no primitive/transform call found)"
         )
 
     # 5. Params consistency

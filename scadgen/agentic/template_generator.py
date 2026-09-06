@@ -12,6 +12,7 @@ from scadgen.agentic.types import AssemblyPlan, PartSpec
 from scadgen.core.template_registry import TemplateRegistry
 from scadgen.exceptions import TemplateGenerationError
 from scadgen.nlp.providers import LLMProvider
+from scadgen.render import check_scad
 
 if TYPE_CHECKING:
     from scadgen.types import Template
@@ -24,11 +25,13 @@ class TemplateGenerator:
         registry: TemplateRegistry,
         template_dir: Path,
         max_retries: int = 3,
+        openscad_bin: str | None = None,
     ):
         self._provider = provider
         self._registry = registry
         self._template_dir = template_dir
         self._max_retries = max_retries
+        self._openscad_bin = openscad_bin
 
     def generate_missing(
         self,
@@ -68,7 +71,10 @@ class TemplateGenerator:
 
         last_errors: list[str] = []
         for attempt in range(self._max_retries):
+            # Cheap static pass first, then the authoritative OpenSCAD render.
             errors = validate_template(code)
+            if not errors:
+                errors = self._render_errors(code)
             if not errors:
                 return self._save_and_register(part.suggested_template, code)
 
@@ -82,6 +88,22 @@ class TemplateGenerator:
         raise TemplateGenerationError(
             part.suggested_template, self._max_retries, last_errors
         )
+
+    def _render_errors(self, code: str) -> list[str]:
+        """Render-check with OpenSCAD; empty list if it renders.
+
+        No binary configured → skip (empty). If the checker itself errors
+        unexpectedly, fail closed (report an error) so unvalidated code is
+        never saved as if it rendered.
+        """
+        if not self._openscad_bin:
+            return []
+        try:
+            return check_scad(code, self._openscad_bin)
+        except FileNotFoundError:
+            return []
+        except Exception as e:  # noqa: BLE001 - fail closed on checker malfunction
+            return [f"OpenSCAD render-check failed to run: {e}"]
 
     def _save_and_register(self, template_id: str, code: str) -> Path:
         """Write .scad file and register in the template registry."""

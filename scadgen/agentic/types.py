@@ -13,6 +13,12 @@ class PartSpec:
     suggested_template: str
     suggested_params: dict[str, Any] = field(default_factory=dict)
     role: str = "structural"
+    # True when the LLM marks this as a complex, non-primitive part that must
+    # be generated rather than fuzzy-matched to a catalog primitive.
+    custom: bool = False
+    # Optional repetition, e.g. {"type": "radial", "count": 12, "radius": 60}
+    # or {"type": "linear", "count": 5, "spacing": 20, "axis": "x"}.
+    pattern: dict[str, Any] | None = None
 
 
 @dataclass

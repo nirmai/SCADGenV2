@@ -7,6 +7,8 @@ import re
 from scadgen.agentic.types import AssemblyPlan
 from scadgen.core.template_registry import TemplateRegistry
 
+_PRIMITIVES = {"cube", "cylinder", "sphere", "cone", "torus"}
+
 
 class TemplateInventory:
     def __init__(self, registry: TemplateRegistry):
@@ -15,7 +17,10 @@ class TemplateInventory:
     def check(self, plan: AssemblyPlan) -> AssemblyPlan:
         """Classify each part's template as found or needed.
 
-        Also attempts fuzzy matching when the exact template_id is not found.
+        Custom parts (flagged by the decomposer) are forced to generation
+        unless they exactly match a non-primitive catalog template — this
+        keeps complex parts from being fuzzy-matched down to a bare primitive.
+        Otherwise, exact match then fuzzy match, else mark for generation.
         Mutates and returns the same plan object.
         """
         found: list[str] = []
@@ -23,6 +28,20 @@ class TemplateInventory:
 
         for part in plan.parts:
             tid = part.suggested_template
+
+            # Complex parts must be generated, not collapsed onto a primitive.
+            if part.custom:
+                resolved = self._resolve_id(tid)
+                if resolved is not None and resolved not in _PRIMITIVES:
+                    part.suggested_template = resolved
+                    if resolved not in found:
+                        found.append(resolved)
+                else:
+                    gen_id = self._dedupe_generated_id(tid, part.part_id)
+                    part.suggested_template = gen_id
+                    if gen_id not in needed:
+                        needed.append(gen_id)
+                continue
 
             # Exact match (includes alias lookup)
             try:
@@ -47,6 +66,20 @@ class TemplateInventory:
         plan.templates_found = found
         plan.templates_needed = needed
         return plan
+
+    def _resolve_id(self, tid: str) -> str | None:
+        """Return the canonical template_id if `tid` matches one, else None."""
+        try:
+            return self._registry.get(tid).template_id
+        except Exception:
+            return None
+
+    def _dedupe_generated_id(self, tid: str, part_id: str) -> str:
+        """Pick a template id to generate under, avoiding primitive collisions."""
+        if tid and tid not in _PRIMITIVES:
+            return tid
+        base = part_id if part_id and part_id not in _PRIMITIVES else f"{tid}_custom"
+        return base
 
     def _fuzzy_match(self, description: str, suggested_id: str) -> str | None:
         """Try to find a matching template by keyword overlap."""
