@@ -11,7 +11,8 @@ def main(argv: list[str] | None = None) -> None:
         description="AI-powered parametric OpenSCAD generator",
     )
     parser.add_argument("--version", action="version", version="scadgen 0.1.0")
-    parser.add_argument("--provider", default="auto", choices=["auto", "ollama", "openai"],
+    parser.add_argument("--provider", default="auto",
+                        choices=["auto", "ollama", "openai", "anthropic"],
                         help="LLM provider (for interactive mode)")
     parser.add_argument("--output-dir", default="generated_scad",
                         help="Output directory (for interactive mode)")
@@ -39,6 +40,16 @@ def main(argv: list[str] | None = None) -> None:
     inf = subparsers.add_parser("info", help="Show template details")
     inf.add_argument("template_id", help="Template ID")
 
+    # assemble
+    asm = subparsers.add_parser("assemble", help="Generate a multi-part assembly from NL description")
+    asm.add_argument("description", help="Natural language description of the assembly")
+    asm.add_argument("--output", "-o", default="", help="Output .scad file path")
+    asm.add_argument("--output-dir", default="output", help="Output directory")
+    asm.add_argument("--provider", default="auto",
+                     choices=["auto", "ollama", "openai", "anthropic"])
+    asm.add_argument("--dry-run", action="store_true", help="Show plan without executing")
+    asm.add_argument("-v", "--verbose", action="store_true")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -51,6 +62,8 @@ def main(argv: list[str] | None = None) -> None:
         _cmd_list(args)
     elif args.command == "info":
         _cmd_info(args)
+    elif args.command == "assemble":
+        _cmd_assemble(args)
 
 
 def _cmd_interactive(args: argparse.Namespace) -> None:
@@ -125,7 +138,7 @@ def _cmd_generate(args: argparse.Namespace) -> None:
     if not output_path and not args.stdout:
         output_path = str(Path("generated_scad") / f"generated_{args.template or 'part'}.scad")
 
-    from scadgen.exceptions import ConstraintViolationError
+    from scadgen.exceptions import ConstraintViolationError, SCADGenError
     try:
         result = engine.generate(
             description=args.description,
@@ -137,6 +150,9 @@ def _cmd_generate(args: argparse.Namespace) -> None:
         print("Geometry error:", file=sys.stderr)
         for v in e.violations:
             print(f"  - {v}", file=sys.stderr)
+        sys.exit(1)
+    except SCADGenError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
     if args.stdout:
@@ -210,3 +226,37 @@ def _cmd_info(args: argparse.Namespace) -> None:
         print("Derived values:")
         for name, expr in tmpl.derived_expressions.items():
             print(f"  {name} = {expr}")
+
+
+def _cmd_assemble(args: argparse.Namespace) -> None:
+    from scadgen.agentic import assemble
+    from scadgen.core.engine import SCADEngine
+    from scadgen.exceptions import AgenticError
+
+    engine = SCADEngine(provider=args.provider)
+
+    try:
+        result = assemble(
+            description=args.description,
+            engine=engine,
+            output_path=args.output,
+            output_dir=args.output_dir,
+            dry_run=args.dry_run,
+            verbose=args.verbose,
+        )
+    except AgenticError as e:
+        print(f"Assembly error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.dry_run:
+        print("Dry run complete — no .scad file written. Run without --dry-run to generate.")
+    else:
+        print(f"Assembly generated: {result.output_path}")
+        print(f"Parts: {len(result.plan.parts)}")
+        if result.generated_templates:
+            print(f"New templates created: {len(result.generated_templates)}")
+            for t in result.generated_templates:
+                print(f"  {t}")
+
+    for w in result.warnings:
+        print(f"Warning: {w}", file=sys.stderr)

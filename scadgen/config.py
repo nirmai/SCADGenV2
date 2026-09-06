@@ -12,6 +12,8 @@ class Config:
     ollama_model: str = "mistral"
     openai_model: str = "gpt-4o-mini"
     openai_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-20250514"
+    anthropic_api_key: str = ""
     template_dirs: list[str] = field(default_factory=list)
     output_dir: str = ""
     openscad_path: str = ""
@@ -26,6 +28,8 @@ class Config:
             ollama_model=os.environ.get("OLLAMA_MODEL", "mistral"),
             openai_model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
             openai_api_key=os.environ.get("OPENAI_API_KEY", ""),
+            anthropic_model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514"),
+            anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
             template_dirs=[pkg_templates],
             output_dir=os.environ.get("SCADGEN_OUTPUT_DIR", ""),
             openscad_path=os.environ.get("OPENSCAD_PATH", ""),

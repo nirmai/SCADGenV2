@@ -64,12 +64,12 @@
 // connectors:
 //   - name: thread_axis
 //     type: threaded
-//     origin: [0, 0, 0]
+//     origin: [0, 0, "thickness / 2"]
 //     direction: [0, 0, 1]
 //     diameter_ref: thread_diam
 //   - name: top_face
 //     type: planar
-//     origin: [0, 0, 0]
+//     origin: [0, 0, "thickness"]
 //     direction: [0, 0, 1]
 //   - name: bottom_face
 //     type: planar

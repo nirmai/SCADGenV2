@@ -7,6 +7,7 @@
 // tags: [bushing, sleeve, bearing, spacer, washer]
 // aliases: [bushing, sleeve, spacer, sleeve bearing]
 // keywords: [bushing, sleeve, bearing, spacer, inner, outer, wall, press, fit]
+// length_param: length
 // params:
 //   - name: inner_d
 //     type: float
@@ -32,12 +33,12 @@
 // connectors:
 //   - name: bore_axis
 //     type: axial
-//     origin: [0, 0, 0]
+//     origin: [0, 0, "thickness / 2"]
 //     direction: [0, 0, 1]
 //     diameter_ref: inner_d
 //   - name: outer_axis
 //     type: axial
-//     origin: [0, 0, 0]
+//     origin: [0, 0, "thickness / 2"]
 //     direction: [0, 0, 1]
 //     diameter_ref: outer_d
 // constraints:

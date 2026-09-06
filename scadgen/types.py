@@ -54,8 +54,8 @@ class ConstraintDef:
 class ConnectorDef:
     name: str
     type: str  # "axial", "planar", "threaded", "snap"
-    origin: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
-    direction: list[float] = field(default_factory=lambda: [0.0, 0.0, 1.0])
+    origin: list[float | str] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    direction: list[float | str] = field(default_factory=lambda: [0.0, 0.0, 1.0])
     diameter_ref: str = ""
 
 
@@ -73,6 +73,7 @@ class Template:
     source_code: str = ""
     aliases: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
+    length_param: str = ""
     constraints: list[ConstraintDef] = field(default_factory=list)
 
     def validate_params(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -138,5 +139,6 @@ class GenerationResult:
     warnings: list[str] = field(default_factory=list)
 
 
-class ParameterValidationError(ValueError):
-    pass
+from scadgen.exceptions import ParameterValidationError  # noqa: E402
+
+__all__ = ["ParameterValidationError"]

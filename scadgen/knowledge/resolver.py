@@ -301,6 +301,9 @@ _PATTERNS: list[tuple[re.Pattern, _ResolverFn]] = [
 class EngineeringResolver:
     """Resolve standard designations in free text into parameter values."""
 
+    def __init__(self, registry=None):
+        self._registry = registry
+
     def resolve(self, description: str) -> ResolvedInput:
         all_params: dict[str, Any] = {}
         all_standards: list[str] = []
@@ -333,14 +336,20 @@ class EngineeringResolver:
         generic_length = length_mm or inches_mm
 
         if generic_length is not None:
-            if suggested_template in ("hex_bolt",):
-                all_params.setdefault("shaft_len", generic_length)
-            elif suggested_template in ("cylinder",):
-                all_params.setdefault("height", generic_length)
-            elif suggested_template in ("bushing",):
-                all_params.setdefault("length", generic_length)
-            else:
+            routed = False
+            if suggested_template and self._registry:
+                try:
+                    tmpl = self._registry.get(suggested_template)
+                    if tmpl.length_param:
+                        all_params.setdefault(tmpl.length_param, generic_length)
+                        routed = True
+                except Exception:
+                    pass
+            if not routed:
                 all_params.setdefault("_length_mm", generic_length)
+
+        if suggested_template == "washer":
+            self._map_bolt_params_to_washer(all_params)
 
         return ResolvedInput(
             original=description,
@@ -350,19 +359,64 @@ class EngineeringResolver:
             confidence=max_confidence,
         )
 
+    def _map_bolt_params_to_washer(self, params: dict[str, Any]) -> None:
+        """When template is washer, convert bolt params (shaft_diam) to washer params."""
+        shaft_diam = params.pop("shaft_diam", None)
+        params.pop("head_flat", None)
+        params.pop("head_height", None)
+        params.pop("thread_pitch", None)
+        params.pop("pitch", None)
+        if shaft_diam is not None and "inner_diam" not in params:
+            from scadgen.knowledge.standards import ISO_METRIC_THREADS, ISO_WASHERS
+            for key, data in ISO_METRIC_THREADS.items():
+                if abs(data["shaft_diam"] - shaft_diam) < 0.01:
+                    washer = ISO_WASHERS.get(key)
+                    if washer:
+                        params.setdefault("inner_diam", washer["inner_diam"])
+                        params.setdefault("outer_diam", washer["outer_diam"])
+                        params.setdefault("thickness", washer["thickness"])
+                    break
+
     def _infer_template(self, description: str, params: dict[str, Any]) -> str | None:
         desc_lower = description.lower()
 
+        # Fastener differentiation requires param-based routing (templates
+        # can't self-describe "choose me when shaft_diam is present")
         if "shaft_diam" in params or "thread_pitch" in params or "pitch" in params:
-            if any(w in desc_lower for w in ("bolt", "screw", "cap screw")):
+            if any(w in desc_lower for w in ("socket head", "shcs", "allen bolt", "allen screw", "cap screw", "socket cap")):
+                return "socket_head_cap_screw"
+            if any(w in desc_lower for w in ("countersunk", "flat head", "flush", "csk")):
+                return "countersunk_screw"
+            if any(w in desc_lower for w in ("set screw", "grub screw", "headless")):
+                return "set_screw"
+            if any(w in desc_lower for w in ("bolt", "screw", "hex bolt", "hex head")):
                 return "hex_bolt"
-            if any(w in desc_lower for w in ("nut",)):
+            if "nut" in desc_lower:
                 return "hex_nut"
 
         if "modul" in params or "teeth" in params:
             return "gear_spur"
 
-        if any(w in desc_lower for w in ("bushing", "sleeve", "bearing housing")):
-            return "bushing"
+        if not self._registry:
+            return None
 
-        return None
+        # Data-driven scoring: template metadata IS the routing table
+        has_fastener_words = any(w in desc_lower for w in ("bolt", "screw", "nut"))
+        best_tid, best_score = None, 0.0
+
+        for tmpl in self._registry.list_templates():
+            score = 0.0
+            for alias in tmpl.aliases:
+                a = alias.lower()
+                if a in desc_lower:
+                    score = max(score, 3.0 + len(a.split()))
+            for kw in tmpl.keywords:
+                if kw.lower() in desc_lower:
+                    score += 1.0
+            if has_fastener_words and not tmpl.category.startswith("fastener") and score < 5:
+                score = 0.0
+            if score > best_score:
+                best_score = score
+                best_tid = tmpl.template_id
+
+        return best_tid if best_score > 0 else None

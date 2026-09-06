@@ -5,8 +5,9 @@
 // description: Cylinder or tube (hollow when inner_diam > 0), with optional cutter mode
 // category: primitive
 // tags: [cylinder, tube, pipe, rod, shaft, hollow]
-// aliases: [cylinder, tube, pipe, rod, shaft]
-// keywords: [cylinder, tube, pipe, rod, shaft, hollow, bore, diameter, height, wall]
+// aliases: [cylinder, tube, pipe]
+// keywords: [cylinder, tube, pipe, hollow, bore, diameter, height, wall]
+// length_param: height
 // params:
 //   - name: diam
 //     type: float
@@ -77,10 +78,7 @@ module cylinder_shape(diam=20, height=40, center=false,
     $fn = fn;
 
     extra_h = as_cutter ? (height + 2*overshoot) : height;
-    z_shift = 0;
-    if (as_cutter) {
-        z_shift = center ? 0 : -overshoot;
-    }
+    z_shift = as_cutter ? (center ? 0 : -overshoot) : 0;
 
     if (inner_diam <= 0) {
         translate([0,0,z_shift])

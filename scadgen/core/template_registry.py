@@ -40,6 +40,20 @@ class TemplateRegistry:
     def all_ids(self) -> list[str]:
         return sorted(self._templates.keys())
 
+    def template_dir(self) -> Path | None:
+        """Return the directory of the first registered template, or None."""
+        for tmpl in self._templates.values():
+            return Path(tmpl.file_path).parent
+        return None
+
+    def register_template(self, path: Path) -> Template:
+        """Parse and register a single .scad file without full reload."""
+        tmpl = self._parse_template(path)
+        self._templates[tmpl.template_id] = tmpl
+        for alias in tmpl.aliases:
+            self._alias_map[alias.lower()] = tmpl.template_id
+        return tmpl
+
     def _scan_directory(self, directory: Path) -> None:
         if not directory.is_dir():
             return
@@ -131,5 +145,6 @@ class TemplateRegistry:
             source_code=source,
             aliases=meta.get("aliases", []),
             keywords=meta.get("keywords", []),
+            length_param=meta.get("length_param", ""),
             constraints=constraints,
         )

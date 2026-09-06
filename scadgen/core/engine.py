@@ -22,7 +22,7 @@ class SCADEngine:
 
         self.registry = TemplateRegistry(self.config.template_dirs)
         self.renderer = SCADRenderer()
-        self.resolver = EngineeringResolver()
+        self.resolver = EngineeringResolver(registry=self.registry)
         self._extractor = None
 
     @property

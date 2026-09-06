@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 from typing import Any
 
@@ -9,6 +8,7 @@ from scadgen.core.template_registry import TemplateRegistry
 from scadgen.exceptions import ExtractionError
 from scadgen.knowledge.resolver import EngineeringResolver
 from scadgen.nlp.prompts import build_extraction_prompt
+from scadgen.nlp.json_utils import parse_json_response
 from scadgen.nlp.providers import LLMProvider, create_provider
 from scadgen.types import ExtractionResult, ResolvedInput, Template
 
@@ -119,34 +119,7 @@ class ParameterExtractor:
         raise ExtractionError(f"Cannot resolve template: {template_id}")
 
     def _parse_response(self, text: str) -> dict[str, Any]:
-        cleaned = text.strip()
-        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
-        cleaned = re.sub(r"\s*```$", "", cleaned)
-
-        # Normalize Python booleans/None to JSON
-        cleaned = re.sub(r"\bTrue\b", "true", cleaned)
-        cleaned = re.sub(r"\bFalse\b", "false", cleaned)
-        cleaned = re.sub(r"\bNone\b", "null", cleaned)
-
-        # Try parsing the full cleaned text first
         try:
-            return json.loads(cleaned)
-        except json.JSONDecodeError:
-            pass
-
-        # Find the outermost { ... } pair (handles nested braces)
-        start = cleaned.find("{")
-        if start != -1:
-            depth = 0
-            for i in range(start, len(cleaned)):
-                if cleaned[i] == "{":
-                    depth += 1
-                elif cleaned[i] == "}":
-                    depth -= 1
-                    if depth == 0:
-                        try:
-                            return json.loads(cleaned[start : i + 1])
-                        except json.JSONDecodeError:
-                            break
-
-        raise ExtractionError(f"Could not parse LLM response as JSON: {text[:200]}")
+            return parse_json_response(text)
+        except ValueError as e:
+            raise ExtractionError(str(e)) from e

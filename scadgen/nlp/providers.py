@@ -11,7 +11,7 @@ from scadgen.exceptions import ProviderError, ProviderUnavailableError
 
 class LLMProvider(ABC):
     @abstractmethod
-    def chat(self, prompt: str, system: str = "") -> str: ...
+    def chat(self, prompt: str, system: str = "", max_tokens: int = 0) -> str: ...
 
     @abstractmethod
     def is_available(self) -> bool: ...
@@ -22,7 +22,7 @@ class OllamaProvider(LLMProvider):
         self.base_url = base_url.rstrip("/")
         self.model = model
 
-    def chat(self, prompt: str, system: str = "") -> str:
+    def chat(self, prompt: str, system: str = "", max_tokens: int = 0) -> str:
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -47,13 +47,51 @@ class OllamaProvider(LLMProvider):
             return False
 
 
+class AnthropicProvider(LLMProvider):
+    def __init__(self, api_key: str, model: str = "claude-sonnet-4-20250514"):
+        self.api_key = api_key
+        self.model = model
+        self._client = None
+
+    def chat(self, prompt: str, system: str = "", max_tokens: int = 0) -> str:
+        client = self._get_client()
+        kwargs: dict = {
+            "model": self.model,
+            "max_tokens": max_tokens or 4096,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if system:
+            kwargs["system"] = system
+
+        try:
+            resp = client.messages.create(**kwargs)
+            return resp.content[0].text
+        except Exception as e:
+            raise ProviderError(f"Anthropic request failed: {e}") from e
+
+    def is_available(self) -> bool:
+        return bool(self.api_key)
+
+    def _get_client(self):
+        if self._client is None:
+            try:
+                import anthropic
+
+                self._client = anthropic.Anthropic(api_key=self.api_key)
+            except ImportError:
+                raise ProviderUnavailableError(
+                    "anthropic package not installed. Install with: pip install anthropic"
+                )
+        return self._client
+
+
 class OpenAIProvider(LLMProvider):
     def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
         self.api_key = api_key
         self.model = model
         self._client = None
 
-    def chat(self, prompt: str, system: str = "") -> str:
+    def chat(self, prompt: str, system: str = "", max_tokens: int = 0) -> str:
         client = self._get_client()
         messages = []
         if system:
@@ -65,8 +103,7 @@ class OpenAIProvider(LLMProvider):
                 model=self.model,
                 messages=messages,
                 temperature=0.2,
-                max_tokens=1000,
-                response_format={"type": "json_object"},
+                max_tokens=max_tokens or 4096,
             )
             return resp.choices[0].message.content or ""
         except Exception as e:
@@ -91,18 +128,24 @@ class OpenAIProvider(LLMProvider):
 def create_provider(config: Config) -> LLMProvider:
     if config.provider == "ollama":
         return OllamaProvider(config.ollama_url, config.ollama_model)
+    if config.provider == "anthropic":
+        if not config.anthropic_api_key:
+            raise ProviderUnavailableError("ANTHROPIC_API_KEY not set")
+        return AnthropicProvider(config.anthropic_api_key, config.anthropic_model)
     if config.provider == "openai":
         if not config.openai_api_key:
             raise ProviderUnavailableError("OPENAI_API_KEY not set")
         return OpenAIProvider(config.openai_api_key, config.openai_model)
 
-    # auto-detect: try Ollama first, then OpenAI
+    # auto-detect: Ollama → Anthropic → OpenAI
     ollama = OllamaProvider(config.ollama_url, config.ollama_model)
     if ollama.is_available():
         return ollama
+    if config.anthropic_api_key:
+        return AnthropicProvider(config.anthropic_api_key, config.anthropic_model)
     if config.openai_api_key:
         return OpenAIProvider(config.openai_api_key, config.openai_model)
 
     raise ProviderUnavailableError(
-        "No LLM provider available. Start Ollama or set OPENAI_API_KEY."
+        "No LLM provider available. Start Ollama, or set ANTHROPIC_API_KEY / OPENAI_API_KEY."
     )

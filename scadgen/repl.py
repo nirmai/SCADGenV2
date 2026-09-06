@@ -54,6 +54,7 @@ class InteractiveSession:
                 "output": self._cmd_output,
                 "last": self._cmd_last,
                 "provider": self._cmd_provider,
+                "assemble": self._cmd_assemble,
             }.get(cmd)
             if handler:
                 handler(arg)
@@ -74,7 +75,8 @@ class InteractiveSession:
         print("    /clear               Clear parameter overrides")
         print("    /output <directory>  Change output directory")
         print("    /last                Show last generated part info")
-        print("    /provider <name>     Switch LLM provider (ollama/openai)")
+        print("    /provider <name>     Switch LLM provider (ollama/openai/anthropic)")
+        print("    /assemble <desc>     Generate a multi-part assembly from description")
         print("    /help                Show this help")
         print("    quit                 Exit")
         print()
@@ -171,12 +173,43 @@ class InteractiveSession:
             print(f"  Provider: {self.engine.config.provider}")
             return
         name = arg.strip().lower()
-        if name not in ("ollama", "openai", "auto"):
+        if name not in ("ollama", "openai", "anthropic", "auto"):
             print(f"  Unknown provider: {name}  (use ollama, openai, or auto)")
             return
         self.engine.config.provider = name
         self.engine._extractor = None
         print(f"  Provider: {name}")
+
+    def _cmd_assemble(self, arg: str) -> None:
+        if not arg:
+            print("  Usage: /assemble <description>")
+            print("  Example: /assemble make a desk lamp")
+            return
+
+        from scadgen.agentic import assemble
+        from scadgen.exceptions import AgenticError
+
+        print(f"\n  Assembling: \"{arg}\"")
+        try:
+            result = assemble(
+                description=arg,
+                engine=self.engine,
+                output_dir=self.output_dir,
+                verbose=True,
+            )
+        except AgenticError as e:
+            print(f"\n  Assembly error: {e}")
+            return
+        except Exception as e:
+            print(f"\n  Error: {e}")
+            return
+
+        print(f"\n  Assembly generated: {result.output_path}")
+        print(f"  Parts: {len(result.plan.parts)}")
+        if result.generated_templates:
+            print(f"  New templates: {len(result.generated_templates)}")
+        for w in result.warnings:
+            print(f"  Warning: {w}")
 
     def _generate(self, description: str) -> None:
         # Step 1: Extract template + params (resolver + LLM)

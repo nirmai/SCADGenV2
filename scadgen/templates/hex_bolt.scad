@@ -7,6 +7,7 @@
 // tags: [bolt, hex, fastener, screw, thread, metric]
 // aliases: [bolt, hex bolt, cap screw, hex head bolt]
 // keywords: [bolt, screw, hex, head, shaft, thread, pitch, fastener, M3, M4, M5, M6, M8, M10, M12, M16, M20]
+// length_param: shaft_len
 // params:
 //   - name: shaft_diam
 //     type: float
@@ -76,11 +77,11 @@
 //     diameter_ref: shaft_diam
 //   - name: head_top
 //     type: planar
-//     origin: [0, 0, 0]
+//     origin: [0, 0, "head_height"]
 //     direction: [0, 0, 1]
 //   - name: thread_end
 //     type: threaded
-//     origin: [0, 0, 0]
+//     origin: [0, 0, "-shaft_len"]
 //     direction: [0, 0, -1]
 //     diameter_ref: shaft_diam
 // constraints:

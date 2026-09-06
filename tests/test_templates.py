@@ -11,8 +11,12 @@ from scadgen.core.renderer import SCADRenderer
 TEMPLATES_DIR = str(Path(__file__).resolve().parent.parent / "scadgen" / "templates")
 
 EXPECTED_TEMPLATES = [
-    "bushing", "cone", "cube", "cylinder", "gear_spur",
-    "hex_bolt", "hex_nut", "sphere", "torus",
+    "bearing_shell", "bushing", "cone", "connecting_rod",
+    "countersunk_screw", "cube", "cylinder", "cylinder_block",
+    "cylinder_head", "flywheel", "gasket", "gear_spur",
+    "hex_bolt", "hex_nut", "oil_pan", "piston", "pulley",
+    "set_screw", "shaft", "socket_head_cap_screw",
+    "sphere", "spring_compression", "torus", "valve", "washer",
 ]
 
 
@@ -56,6 +60,24 @@ def test_alias_lookup():
     assert registry.get("cog").template_id == "gear_spur"
 
 
+def test_engine_alias_lookup():
+    registry = get_registry()
+    assert registry.get("poppet valve").template_id == "valve"
+    assert registry.get("intake valve").template_id == "valve"
+    assert registry.get("axle").template_id == "shaft"
+    assert registry.get("spindle").template_id == "shaft"
+    assert registry.get("con rod").template_id == "connecting_rod"
+    assert registry.get("conrod").template_id == "connecting_rod"
+    assert registry.get("engine block").template_id == "cylinder_block"
+    assert registry.get("crankcase").template_id == "cylinder_block"
+
+
+def test_cylinder_no_longer_aliases_shaft_or_rod():
+    registry = get_registry()
+    assert registry.get("shaft").template_id == "shaft"
+    assert registry.get("cylinder").template_id == "cylinder"
+
+
 def test_parameter_validation():
     registry = get_registry()
     gear = registry.get("gear_spur")
@@ -89,6 +111,40 @@ def test_gear_render_no_difference_bug():
     assert call_line.startswith("gear_spur(")
 
 
+def test_tier3_alias_lookup():
+    registry = get_registry()
+    assert registry.get("compression spring").template_id == "spring_compression"
+    assert registry.get("coil spring").template_id == "spring_compression"
+    assert registry.get("head gasket").template_id == "gasket"
+    assert registry.get("journal bearing").template_id == "bearing_shell"
+    assert registry.get("plain bearing").template_id == "bearing_shell"
+    assert registry.get("sheave").template_id == "pulley"
+    assert registry.get("belt pulley").template_id == "pulley"
+    assert registry.get("flywheel").template_id == "flywheel"
+    assert registry.get("oil sump").template_id == "oil_pan"
+    assert registry.get("crankcase pan").template_id == "oil_pan"
+
+
+def test_tier3_length_param_metadata():
+    registry = get_registry()
+    assert registry.get("spring_compression").length_param == "free_length"
+    assert registry.get("gasket").length_param == "thickness"
+    assert registry.get("bearing_shell").length_param == "width"
+    assert registry.get("pulley").length_param == "hub_length"
+    assert registry.get("flywheel").length_param == "thickness"
+    assert registry.get("oil_pan").length_param == "depth"
+
+
+def test_existing_length_param_metadata():
+    registry = get_registry()
+    assert registry.get("hex_bolt").length_param == "shaft_len"
+    assert registry.get("shaft").length_param == "length"
+    assert registry.get("valve").length_param == "stem_len"
+    assert registry.get("piston").length_param == "bore_diam"
+    assert registry.get("washer").length_param == "thickness"
+    assert registry.get("gear_spur").length_param == ""
+
+
 if __name__ == "__main__":
     test_all_templates_discovered()
     test_all_templates_have_params()
@@ -97,4 +153,7 @@ if __name__ == "__main__":
     test_parameter_validation()
     test_derived_values()
     test_gear_render_no_difference_bug()
+    test_tier3_alias_lookup()
+    test_tier3_length_param_metadata()
+    test_existing_length_param_metadata()
     print("All template tests passed!")

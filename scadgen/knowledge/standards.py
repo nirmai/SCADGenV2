@@ -216,6 +216,64 @@ NOMINAL_PIPE_SIZES: dict[str, tuple[float, float]] = {
 }
 
 
+# ──────────────────────────────────────────────
+# Socket Head Cap Screws (ISO 4762 / DIN 912)
+# ──────────────────────────────────────────────
+
+ISO_SHCS: dict[str, dict] = {
+    "M2":   {"shaft_diam": 2.0,  "head_diam": 3.8,  "head_height": 2.0,  "socket_size": 1.5,  "socket_depth": 1.0},
+    "M2.5": {"shaft_diam": 2.5,  "head_diam": 4.5,  "head_height": 2.5,  "socket_size": 2.0,  "socket_depth": 1.1},
+    "M3":   {"shaft_diam": 3.0,  "head_diam": 5.5,  "head_height": 3.0,  "socket_size": 2.5,  "socket_depth": 1.3},
+    "M4":   {"shaft_diam": 4.0,  "head_diam": 7.0,  "head_height": 4.0,  "socket_size": 3.0,  "socket_depth": 2.0},
+    "M5":   {"shaft_diam": 5.0,  "head_diam": 8.5,  "head_height": 5.0,  "socket_size": 4.0,  "socket_depth": 2.5},
+    "M6":   {"shaft_diam": 6.0,  "head_diam": 10.0, "head_height": 6.0,  "socket_size": 5.0,  "socket_depth": 3.0},
+    "M8":   {"shaft_diam": 8.0,  "head_diam": 13.0, "head_height": 8.0,  "socket_size": 6.0,  "socket_depth": 4.0},
+    "M10":  {"shaft_diam": 10.0, "head_diam": 16.0, "head_height": 10.0, "socket_size": 8.0,  "socket_depth": 5.0},
+    "M12":  {"shaft_diam": 12.0, "head_diam": 18.0, "head_height": 12.0, "socket_size": 10.0, "socket_depth": 6.0},
+    "M14":  {"shaft_diam": 14.0, "head_diam": 21.0, "head_height": 14.0, "socket_size": 12.0, "socket_depth": 7.0},
+    "M16":  {"shaft_diam": 16.0, "head_diam": 24.0, "head_height": 16.0, "socket_size": 14.0, "socket_depth": 8.0},
+    "M20":  {"shaft_diam": 20.0, "head_diam": 30.0, "head_height": 20.0, "socket_size": 17.0, "socket_depth": 10.0},
+    "M24":  {"shaft_diam": 24.0, "head_diam": 36.0, "head_height": 24.0, "socket_size": 19.0, "socket_depth": 12.0},
+}
+
+# ──────────────────────────────────────────────
+# Countersunk Screws (ISO 10642)
+# head_angle is always 90 degrees for metric
+# ──────────────────────────────────────────────
+
+ISO_COUNTERSUNK: dict[str, dict] = {
+    "M3":   {"shaft_diam": 3.0,  "head_diam": 6.72,  "head_height": 1.86, "socket_size": 2.0},
+    "M4":   {"shaft_diam": 4.0,  "head_diam": 8.96,  "head_height": 2.48, "socket_size": 2.5},
+    "M5":   {"shaft_diam": 5.0,  "head_diam": 11.20, "head_height": 3.10, "socket_size": 3.0},
+    "M6":   {"shaft_diam": 6.0,  "head_diam": 13.44, "head_height": 3.72, "socket_size": 4.0},
+    "M8":   {"shaft_diam": 8.0,  "head_diam": 17.92, "head_height": 4.96, "socket_size": 5.0},
+    "M10":  {"shaft_diam": 10.0, "head_diam": 22.40, "head_height": 6.20, "socket_size": 6.0},
+    "M12":  {"shaft_diam": 12.0, "head_diam": 26.88, "head_height": 7.44, "socket_size": 8.0},
+    "M16":  {"shaft_diam": 16.0, "head_diam": 33.60, "head_height": 8.80, "socket_size": 10.0},
+    "M20":  {"shaft_diam": 20.0, "head_diam": 40.32, "head_height": 10.16, "socket_size": 12.0},
+}
+
+# ──────────────────────────────────────────────
+# Flat Washers (ISO 7089 - normal series)
+# ──────────────────────────────────────────────
+
+ISO_WASHERS: dict[str, dict] = {
+    "M2":   {"inner_diam": 2.2,  "outer_diam": 5.0,   "thickness": 0.3},
+    "M2.5": {"inner_diam": 2.7,  "outer_diam": 6.0,   "thickness": 0.5},
+    "M3":   {"inner_diam": 3.2,  "outer_diam": 7.0,   "thickness": 0.5},
+    "M4":   {"inner_diam": 4.3,  "outer_diam": 9.0,   "thickness": 0.8},
+    "M5":   {"inner_diam": 5.3,  "outer_diam": 10.0,  "thickness": 1.0},
+    "M6":   {"inner_diam": 6.4,  "outer_diam": 12.0,  "thickness": 1.6},
+    "M8":   {"inner_diam": 8.4,  "outer_diam": 16.0,  "thickness": 1.6},
+    "M10":  {"inner_diam": 10.5, "outer_diam": 20.0,  "thickness": 2.0},
+    "M12":  {"inner_diam": 13.0, "outer_diam": 24.0,  "thickness": 2.5},
+    "M14":  {"inner_diam": 15.0, "outer_diam": 28.0,  "thickness": 2.5},
+    "M16":  {"inner_diam": 17.0, "outer_diam": 30.0,  "thickness": 3.0},
+    "M20":  {"inner_diam": 21.0, "outer_diam": 37.0,  "thickness": 3.0},
+    "M24":  {"inner_diam": 25.0, "outer_diam": 44.0,  "thickness": 4.0},
+}
+
+
 def lookup_keyway(shaft_diam: float) -> tuple[float, float, float, float] | None:
     for (lo, hi), dims in KEYWAY_STANDARDS.items():
         if lo <= shaft_diam < hi:
