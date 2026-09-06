@@ -2,6 +2,8 @@
 
 **Turn natural language into complete, parametric OpenSCAD assemblies.**
 
+*Successor to [SCADgen](https://github.com/nirmai/SCADgen), an earlier prototype — rebuilt from scratch around an agentic pipeline and a self-expanding template library.*
+
 SCADGen is an AI-powered CAD generator. Describe an object in plain English — *"make a desk lamp"*, *"build a 4-cylinder engine top end"* — and an agentic pipeline decomposes it into parts, generates any templates it's missing, plans how the parts connect, and emits a ready-to-render `.scad` file.
 
 **The template library grows with use** — ask for something it doesn't have (a birdcage, a spoked wheel) and it gets generated, OpenSCAD-verified, and kept for next time.
