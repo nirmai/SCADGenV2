@@ -53,10 +53,20 @@ class LLMProvider(ABC):
         return False
 
 
+_OLLAMA_VISION_HINTS = (
+    "llava", "bakllava", "vision", "moondream", "minicpm-v",
+    "-vl", "qwen2-vl", "qwen2.5vl", "gemma3", "llama3.2-vision",
+)
+
+
 class OllamaProvider(LLMProvider):
     def __init__(self, base_url: str = "http://localhost:11434", model: str = "mistral"):
         self.base_url = base_url.rstrip("/")
         self.model = model
+
+    def supports_vision(self) -> bool:
+        name = self.model.lower()
+        return any(hint in name for hint in _OLLAMA_VISION_HINTS)
 
     def chat(
         self, prompt: str, system: str = "", max_tokens: int = 0,

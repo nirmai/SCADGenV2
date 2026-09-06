@@ -661,7 +661,9 @@ class TestAnthropicProvider(unittest.TestCase):
     def test_supports_vision(self):
         from scadgen.nlp.providers import AnthropicProvider, OllamaProvider
         self.assertTrue(AnthropicProvider(api_key="k").supports_vision())
-        self.assertFalse(OllamaProvider().supports_vision())
+        self.assertFalse(OllamaProvider(model="mistral").supports_vision())
+        self.assertTrue(OllamaProvider(model="llava").supports_vision())
+        self.assertTrue(OllamaProvider(model="llama3.2-vision").supports_vision())
 
 
 # ── Vision / image input tests ───────────────────────────────────────────
