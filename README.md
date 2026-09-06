@@ -17,7 +17,14 @@ SCADGen is an AI-powered CAD generator. Describe an object in plain English — 
 
 > <img width="524" height="370" alt="Screenshot 2026-09-05 204534" src="https://github.com/user-attachments/assets/1958cc18-9ae4-4abd-b9bc-e543b65fde98" />
 
-> A birdcage from the prompt *"a birdcage with a domed top and vertical bars"* — no birdcage template existed; the dome was written from scratch by the LLM, OpenSCAD-verified, and assembled with a base, radial bars, a ring, and a finial. See [`examples/birdcage.scad`](examples/birdcage.scad).
+> A birdcage from the prompt *"a birdcage with a domed top and vertical bars"* — no birdcage template existed; the dome was written from scratch by the LLM, OpenSCAD-verified, and assembled with a base, radial bars, a ring, and a finial. See [`examples/birdcage.scad`]
+
+<img width="317" height="286" alt="Screenshot 2026-09-06 104425" src="https://github.com/user-attachments/assets/e171e84c-d8df-4783-9b08-78b9d37d1e7b" />
+
+High-res birdcage dome:
+
+<img width="334" height="209" alt="Screenshot 2026-09-06 115131" src="https://github.com/user-attachments/assets/f075941c-7ac8-4cfa-bd59-3e4047150396" />
+
 
 ---
 
