@@ -5,7 +5,7 @@
 SCADGen is an AI-powered CAD generator. Describe an object in plain English — *"make a desk lamp"*, *"build a 4-cylinder engine top end"* — and an agentic pipeline decomposes it into parts, generates any templates it's missing, plans how the parts connect, and emits a ready-to-render `.scad` file.
 
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
-![Tests](https://img.shields.io/badge/tests-348%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-366%20passing-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![OpenSCAD](https://img.shields.io/badge/output-OpenSCAD-orange.svg)
 
@@ -16,6 +16,9 @@ SCADGen is an AI-powered CAD generator. Describe an object in plain English — 
 > A simple 2 piston Engine from the prompt: *"make a simple 2 piston engine*" — engine block, flywheel, gasket, and pistons (inside block) all positioned by the assembly solver
 
 > <img width="524" height="370" alt="Screenshot 2026-09-05 204534" src="https://github.com/user-attachments/assets/1958cc18-9ae4-4abd-b9bc-e543b65fde98" />
+
+> A birdcage from the prompt *"a birdcage with a domed top and vertical bars"* — no birdcage template existed; the dome was written from scratch by the LLM, OpenSCAD-verified, and assembled with a base, radial bars, a ring, and a finial. See [`examples/birdcage.scad`](examples/birdcage.scad).
+
 ---
 
 ## Why this exists
@@ -40,11 +43,11 @@ flowchart LR
     F --> G[".scad assembly"]
 ```
 
-1. **Decompose** — an LLM breaks the description into parts (with suggested templates, parameters, colors) and a connection graph. Optionally guided by a reference image (vision).
-2. **Inventory** — each part is matched against the template library by id, alias, or keyword. Unmatched parts are flagged for generation.
-3. **Generate** — for anything missing, the LLM writes a complete `.scad` template (with metadata and connectors), which is validated and repaired over up to 3 attempts.
+1. **Decompose** — an LLM breaks the description into parts (with suggested templates, parameters, colors, connections), classifying each as a bare primitive, a *pattern* of repeated elements (e.g. cage bars arranged radially), or a genuinely novel shape that needs to be generated. Optionally guided by a reference image (vision).
+2. **Inventory** — each part is matched against the template library by id, alias, or keyword. Parts flagged as novel are routed to generation rather than forced onto the nearest primitive.
+3. **Generate** — for anything missing, the LLM writes a complete `.scad` template (with metadata and connectors), which is checked structurally *and* by actually rendering it in OpenSCAD — repairing and retrying up to 3 times until it's real, renderable geometry.
 4. **Connect** — connector references are validated against real templates and auto-repaired.
-5. **Execute** — a graph solver computes each part's world transform and renders the final `.scad`.
+5. **Execute** — a graph solver computes each part's world transform (including repeated/patterned parts) and renders the final `.scad`.
 
 ### Built to not fall over
 
@@ -55,6 +58,7 @@ Every stage degrades gracefully instead of crashing — the pipeline is designed
 - **Bad connector names** are auto-snapped, LLM-refined, or dropped
 - **Degenerate geometry** (parts overlapping or below the base) falls back to a deterministic vertical stack
 - **Bogus template names / failed generations / orphaned parts** are dropped with warnings, and the rest of the assembly still builds
+- **Generated templates that don't actually render** (undefined variables, no geometry, broken syntax) are caught by rendering them in real OpenSCAD — not just checking their text — and sent back for repair
 
 ---
 
@@ -124,7 +128,7 @@ scadgen/
 └── templates/    # 28 parametric .scad templates with metadata
 ```
 
-- **~5,600 lines of Python**, **348 tests**
+- **~6,000 lines of Python**, **366 tests**
 - Templates are plain `.scad` files with a `SCADGEN_META` YAML header — add a new part by dropping in a file; no code changes
 - LLM-agnostic: swap providers via config or `--provider`
 
@@ -132,22 +136,20 @@ scadgen/
 
 ## Current status & roadmap
 
-SCADGen has a **robust, working pipeline** — it reliably produces valid, correctly-positioned assemblies and never crashes on bad model output. The open frontier is **generation fidelity**: making complex novel objects (a birdcage, a spoked wheel) actually *look* right, not just assemble cleanly.
+SCADGen has a **robust, working pipeline** — it reliably produces valid, correctly-positioned assemblies and never crashes on bad model output. Genuinely novel objects with no matching template (a birdcage with a domed lattice top) are now decomposed, generated from scratch, and OpenSCAD-render-verified end to end — see [`examples/birdcage.scad`](examples/birdcage.scad).
 
 Known limitations, honestly:
 
-- **Decomposition favors primitives** — the model tends to map complex parts onto simple catalog shapes instead of generating new ones
-- **No part multiplicity** — the assembly layer places each part once; radial patterns (cage bars, spokes) need a single template that draws them
-- **Textual validation only** — generated templates are checked for structure, not verified by actually rendering in OpenSCAD
-- **No feedback loop** — the system doesn't yet look at what it rendered to critique and regenerate
+- **Generation fidelity varies with model capability** — a frontier model (Claude, GPT-4o) reliably produces real, structured geometry for novel parts; smaller local models tend to fall back to plain primitives instead of using the pattern/custom-generation machinery
+- **No feedback loop** — the system verifies that generated geometry *renders*, but doesn't yet look at *what* it rendered to critique and improve it
+- **No persistence** — generated templates aren't carried forward into the library across runs, so the same novel object is regenerated from scratch each time
 
 Planned next steps:
 
-- [ ] Render → vision-critique → regenerate loop (close the feedback loop with OpenSCAD)
-- [ ] Push decomposition toward generation for parts the catalog can't represent
-- [ ] Semantic validation that rejects un-renderable OpenSCAD
-- [ ] Part multiplicity / patterning in the assembly layer
+- [ ] Render → vision-critique → regenerate loop (compare the actual render against the request/reference image)
 - [ ] Persist generated templates into the library across runs
+- [ ] Push decomposition further toward generation on weaker/local models
+- [ ] Final-assembly render-check, not just per-template
 
 ---
 
