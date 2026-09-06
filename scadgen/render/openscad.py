@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import os
 import shutil
 import subprocess
@@ -56,11 +57,32 @@ def find_openscad(config=None) -> str | None:
     return None
 
 
+@functools.lru_cache(maxsize=8)
+def _supports_manifold(openscad_bin: str) -> bool:
+    """Probe whether this OpenSCAD build offers the fast Manifold backend.
+
+    Older builds (e.g. the long-standing 2021.01 stable release) only have
+    the slow CGAL backend and don't recognize --backend at all; passing it
+    there would break the call. Result is cached per binary path.
+    """
+    try:
+        proc = subprocess.run(
+            [openscad_bin, "--help"], capture_output=True, text=True, timeout=10,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    help_text = (proc.stdout or "") + (proc.stderr or "")
+    return "Manifold" in help_text
+
+
 def check_scad(source: str, openscad_bin: str, timeout: int = 30) -> list[str]:
     """Render-check OpenSCAD source. Returns a list of error strings (empty = OK).
 
     Exports to STL (forcing full geometry evaluation) and scans stderr for
-    failure patterns. Raises FileNotFoundError if the binary is missing.
+    failure patterns. Uses the Manifold backend when the binary supports it —
+    dramatically faster than the older CGAL backend for boolean-heavy
+    geometry (unions/differences), which is common in generated templates.
+    Raises FileNotFoundError if the binary is missing.
     """
     if not openscad_bin or not Path(openscad_bin).is_file():
         raise FileNotFoundError(f"OpenSCAD binary not found: {openscad_bin!r}")
@@ -70,9 +92,14 @@ def check_scad(source: str, openscad_bin: str, timeout: int = 30) -> list[str]:
         out_path = Path(tmp) / "check.stl"
         scad_path.write_text(source, encoding="utf-8")
 
+        cmd = [openscad_bin, "-o", str(out_path)]
+        if _supports_manifold(openscad_bin):
+            cmd += ["--backend", "Manifold"]
+        cmd.append(str(scad_path))
+
         try:
             proc = subprocess.run(
-                [openscad_bin, "-o", str(out_path), str(scad_path)],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -120,14 +147,19 @@ def render_png(
         scad_path = Path(tmp) / "preview.scad"
         scad_path.write_text(source, encoding="utf-8")
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+
+        cmd = [
+            openscad_bin, "-o", out_path,
+            "--imgsize", f"{w},{h}",
+            "--autocenter", "--viewall",
+        ]
+        if _supports_manifold(openscad_bin):
+            cmd += ["--backend", "Manifold"]
+        cmd.append(str(scad_path))
+
         try:
             proc = subprocess.run(
-                [
-                    openscad_bin, "-o", out_path,
-                    "--imgsize", f"{w},{h}",
-                    "--autocenter", "--viewall",
-                    str(scad_path),
-                ],
+                cmd,
                 capture_output=True, text=True, timeout=timeout,
             )
         except subprocess.TimeoutExpired as e:

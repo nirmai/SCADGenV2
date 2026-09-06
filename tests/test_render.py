@@ -8,6 +8,7 @@ from pathlib import Path
 
 from scadgen.config import Config
 from scadgen.render import check_scad, find_openscad
+from scadgen.render.openscad import _supports_manifold
 
 _VALID_SCAD = "cube([10, 10, 10], center=true);\n"
 _BROKEN_SCAD = "cubee([10, 10, 10]);\n"  # typo'd builtin -> renders nothing / warns
@@ -42,6 +43,30 @@ class TestCheckScadReal(unittest.TestCase):
 
     def test_undefined_variable_flagged(self):
         self.assertTrue(check_scad(_UNDEFINED_SCAD, _OPENSCAD))
+
+
+class TestManifoldDetection(unittest.TestCase):
+    def test_missing_binary_reports_no_manifold(self):
+        _supports_manifold.cache_clear()
+        self.assertFalse(_supports_manifold("/nonexistent/openscad"))
+
+    def test_help_mentioning_manifold_detected(self):
+        """A binary whose --help output mentions Manifold is detected as
+        capable; one that doesn't (old stable releases) is not."""
+        from unittest.mock import MagicMock, patch
+
+        _supports_manifold.cache_clear()
+        with patch("scadgen.render.openscad.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                stdout="--backend arg   3D rendering backend: CGAL or Manifold",
+                stderr="",
+            )
+            self.assertTrue(_supports_manifold("/fake/new-openscad"))
+
+        _supports_manifold.cache_clear()
+        with patch("scadgen.render.openscad.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout="--help  usage info only", stderr="")
+            self.assertFalse(_supports_manifold("/fake/old-openscad"))
 
 
 class TestCheckScadMissingBinary(unittest.TestCase):
