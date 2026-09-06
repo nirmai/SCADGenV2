@@ -143,8 +143,21 @@ class TemplateGenerator:
 
     @staticmethod
     def _strip_fences(text: str) -> str:
-        """Remove markdown code fences if present."""
+        """Remove markdown fences and any prose the LLM wrapped around the file.
+
+        The real template always starts at `// SCADGEN_META_BEGIN`, so trim
+        everything before it and any trailing fence after the module.
+        """
         text = text.strip()
         text = re.sub(r"^```(?:scad|openscad)?\s*\n?", "", text)
         text = re.sub(r"\n?```\s*$", "", text)
-        return text
+
+        # Drop any preamble prose before the metadata block.
+        begin = text.find("// SCADGEN_META_BEGIN")
+        if begin > 0:
+            text = text[begin:]
+
+        # Drop a trailing fence or trailing prose after the last closing brace.
+        text = re.sub(r"\n?```[\s\S]*$", "", text)
+
+        return text.strip()

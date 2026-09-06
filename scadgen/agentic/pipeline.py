@@ -69,9 +69,10 @@ def run_pipeline(
     warnings: list[str] = []
     if plan.templates_needed:
         _log(verbose, "[3/5] Generating missing templates")
-        template_dir = registry.template_dir()
-        if template_dir is None:
-            template_dir = Path(output_dir) / "generated_templates"
+        # Generated templates are OUTPUTS, not part of the packaged template
+        # library — write them under the output dir so the source stays clean.
+        # They are still registered in-session, so assembly works immediately.
+        template_dir = Path(output_dir) / "generated_templates"
         generator = TemplateGenerator(
             provider, registry, template_dir, max_retries=max_retries,
         )
@@ -89,6 +90,26 @@ def run_pipeline(
             ]
     else:
         _log(verbose, "[3/5] No template generation needed")
+
+    # Drop any part whose template still can't be resolved (e.g. an LLM
+    # placeholder like "not_defined", or a template that failed to generate).
+    unresolved = []
+    for part in list(plan.parts):
+        try:
+            registry.get(part.suggested_template)
+        except Exception:
+            unresolved.append(part.part_id)
+    if unresolved:
+        warnings.append(f"Dropped parts with unresolved templates: {', '.join(unresolved)}")
+        _log(verbose, f"  !! Dropping unresolved parts: {unresolved}")
+        drop_ids = set(unresolved)
+        plan.parts = [p for p in plan.parts if p.part_id not in drop_ids]
+        plan.connections = [
+            c for c in plan.connections
+            if c.from_part not in drop_ids and c.to_part not in drop_ids
+        ]
+        if plan.root_part in drop_ids and plan.parts:
+            plan.root_part = plan.parts[0].part_id
 
     if not plan.parts:
         return AssemblyResult(

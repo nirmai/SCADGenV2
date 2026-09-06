@@ -596,6 +596,53 @@ class TestPipelineIntegration(unittest.TestCase):
         finally:
             pipeline_mod.create_provider = original_create
 
+    def test_pipeline_drops_unresolved_placeholder_template(self):
+        """A part with a bogus template name (e.g. 'not_defined') is dropped
+        rather than crashing the connection planner."""
+        decompose_resp = json.dumps({
+            "assembly_name": "engine_top",
+            "root_part": "block",
+            "parts": [
+                {"part_id": "block", "description": "Cylinder block",
+                 "suggested_template": "cylinder_block", "role": "structural"},
+                {"part_id": "gasket", "description": "Head gasket",
+                 "suggested_template": "gasket", "role": "structural"},
+                {"part_id": "mystery", "description": "Unknown widget",
+                 "suggested_template": "not_defined", "role": "structural"},
+            ],
+            "connections": [
+                {"from_part": "block", "from_connector": "deck_face",
+                 "to_part": "gasket", "to_connector": "bottom_face", "type": "mate"},
+                {"from_part": "gasket", "from_connector": "top_face",
+                 "to_part": "mystery", "to_connector": "whatever", "type": "mate"},
+            ],
+            "colors": {"block": "Silver", "gasket": "DarkGray"},
+        })
+
+        from scadgen.agentic.pipeline import run_pipeline
+
+        engine = SCADEngine()
+        import scadgen.agentic.pipeline as pipeline_mod
+        original_create = pipeline_mod.create_provider
+        # No successful template generation: 'not_defined' stays unresolved.
+        provider = MockProvider([decompose_resp, "invalid scad", "invalid", "invalid"])
+        pipeline_mod.create_provider = lambda cfg: provider
+
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                result = run_pipeline(
+                    description="engine with a mystery part",
+                    engine=engine,
+                    output_dir=tmpdir,
+                )
+                self.assertTrue(result.success)
+                part_ids = [p.part_id for p in result.plan.parts]
+                self.assertNotIn("mystery", part_ids)
+                self.assertIn("block", part_ids)
+                self.assertIn("gasket", part_ids)
+        finally:
+            pipeline_mod.create_provider = original_create
+
 
 # ── Anthropic provider tests ────────────────────────────────────────────
 

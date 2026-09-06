@@ -41,6 +41,23 @@ Decompose this object into individual parts. For each part:
 
 Then define how the parts connect using their connector names.
 
+## How connectors work (READ CAREFULLY)
+Each connector has a position on the part and a direction facing outward.
+To STACK part B on top of part A, connect A's TOP connector to B's BOTTOM
+connector with type "mate":
+  A.top_face -> B.bottom_face  (mate)
+This places B's bottom exactly on A's top. Then stack C on B the same way:
+  B.top_face -> C.bottom_face  (mate)
+
+Rules for choosing connectors:
+- To stack upward, always go TOP of the lower part -> BOTTOM of the upper part
+- Use face connectors (top_face, bottom_face) for stacking, NOT center_axis
+  (center_axis is the middle of a part — mating two centers overlaps them)
+- Never attach something to a base's bottom_face unless it truly hangs below
+- EVERY non-root part MUST have at least one connection, or it will be
+  discarded. A 4-part assembly needs at least 3 connections forming a chain
+  from the root outward.
+
 Return ONLY a JSON object with this exact structure:
 {{
   "assembly_name": "short_name",
@@ -83,8 +100,9 @@ Rules:
 - When unsure of a good value, omit the param and the template default is used
 - Use sensible engineering dimensions in mm
 - COLORS: give all parts of a single object the SAME color unless the
-  description calls for different ones. Use OpenSCAD color names (Silver,
-  Goldenrod, DarkGray, etc.)
+  description calls for different ones. Every part_id in "colors" MUST map
+  to a real OpenSCAD color name (Silver, Goldenrod, DarkGray, White, Red,
+  etc.) — never "none", "not_applicable", or an empty string.
 - Return ONLY the JSON, no other text"""
 
     return system, user

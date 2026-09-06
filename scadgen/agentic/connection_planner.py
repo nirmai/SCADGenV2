@@ -84,7 +84,11 @@ class ConnectionPlanner:
         failure the plan is left as-is for Layer 3 to clean up."""
         template_connectors = {}
         for part in plan.parts:
-            tmpl = self._registry.get(part.suggested_template)
+            try:
+                tmpl = self._registry.get(part.suggested_template)
+            except Exception:
+                template_connectors[part.part_id] = []
+                continue
             template_connectors[part.part_id] = [
                 {"name": c.name, "type": c.type, "direction": list(c.direction)}
                 for c in tmpl.connectors
