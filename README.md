@@ -10,6 +10,7 @@ SCADGen is an AI-powered CAD generator. Describe an object in plain English — 
 ![OpenSCAD](https://img.shields.io/badge/output-OpenSCAD-orange.svg)
 
 > A desk lamp generated from the prompt *"make a desk lamp"* — base, gooseneck arm, and shade, each a separate parametric part, positioned by the assembly solver.
+
 > <img width="350" height="419" alt="Screenshot 2026-09-05 210330" src="https://github.com/user-attachments/assets/8633fc03-0328-49ac-a0c4-2b952fd43ab4" />
 
 > A simple 2 piston Engine from the prompt: *"make a simple 2 piston engine*" — engine block, flywheel, gasket, and pistons (inside block) all positioned by the assembly solver
