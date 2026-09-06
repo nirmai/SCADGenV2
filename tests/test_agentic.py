@@ -382,6 +382,46 @@ class TestConnectionPlanner(unittest.TestCase):
         self.assertEqual(len(provider.calls), 1)
         self.assertEqual(result.connections[0].from_connector, "deck_face")
 
+    def test_auto_snap_single_connector_no_llm(self):
+        """A bad reference to a part with exactly one connector snaps to it
+        without any LLM call (lamp_shade has only 'socket')."""
+        plan = AssemblyPlan(
+            name="lamp", description="lamp", root_part="arm",
+            parts=[
+                PartSpec("arm", "Arm", "lamp_arm"),
+                PartSpec("shade", "Shade", "lamp_shade"),
+            ],
+            connections=[
+                ConnectionSpec("arm", "shade_mount", "shade", "wrong_name", "mate"),
+            ],
+        )
+        provider = MockProvider()
+        planner = ConnectionPlanner(provider, self.engine.registry)
+        result = planner.refine(plan)
+
+        self.assertEqual(len(provider.calls), 0)
+        self.assertEqual(result.connections[0].to_connector, "socket")
+
+    def test_unresolvable_connection_dropped_not_raised(self):
+        """When neither auto-snap nor the LLM can fix a connection, it is
+        dropped with a warning instead of raising."""
+        plan = AssemblyPlan(
+            name="engine", description="engine", root_part="block",
+            parts=[
+                PartSpec("block", "Cylinder block", "cylinder_block"),
+                PartSpec("head", "Cylinder head", "cylinder_head"),
+            ],
+            connections=[
+                ConnectionSpec("block", "bogus_a", "head", "bogus_b", "mate"),
+            ],
+        )
+        provider = MockProvider(["{}"])  # LLM returns nothing useful
+        planner = ConnectionPlanner(provider, self.engine.registry)
+        result = planner.refine(plan)
+
+        self.assertEqual(len(result.connections), 0)
+        self.assertTrue(any("Dropped" in w for w in planner.warnings))
+
 
 # ── Executor tests ───────────────────────────────────────────────────────
 
@@ -468,6 +508,32 @@ class TestExecutor(unittest.TestCase):
             self.assertTrue(result.success)
             self.assertIn("cylinder_block", result.scad_code)
             self.assertIn("gasket", result.scad_code)
+
+    def test_orphaned_part_dropped_to_recover(self):
+        """A part with no connection to the root is dropped so the rest of
+        the assembly still renders instead of crashing the solver."""
+        engine = SCADEngine()
+        plan = AssemblyPlan(
+            name="engine", description="engine", root_part="block",
+            parts=[
+                PartSpec("block", "Cylinder block", "cylinder_block"),
+                PartSpec("gasket", "Head gasket", "gasket"),
+                PartSpec("orphan", "Disconnected shaft", "shaft"),
+            ],
+            connections=[
+                ConnectionSpec("block", "deck_face", "gasket", "bottom_face", "mate"),
+            ],
+            colors={},
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            executor = AssemblyExecutor(engine)
+            result = executor.execute(plan, output_dir=tmpdir)
+
+            self.assertTrue(result.success)
+            self.assertIn("cylinder_block", result.scad_code)
+            self.assertIn("gasket", result.scad_code)
+            self.assertTrue(any("orphan" in w for w in result.warnings))
 
 
 # ── Full pipeline integration test (mock LLM) ───────────────────────────

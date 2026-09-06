@@ -22,6 +22,20 @@
 //     max: 512
 //     unit: count
 //     description: Circle resolution
+// connectors:
+//   - name: center_axis
+//     type: axial
+//     origin: [0, 0, 0]
+//     direction: [0, 0, 1]
+//     diameter_ref: diam
+//   - name: top
+//     type: axial
+//     origin: [0, 0, "diam / 2"]
+//     direction: [0, 0, 1]
+//   - name: bottom
+//     type: axial
+//     origin: [0, 0, "-diam / 2"]
+//     direction: [0, 0, -1]
 // SCADGEN_META_END
 
 module sphere_shape(diam=30, fn=96) {

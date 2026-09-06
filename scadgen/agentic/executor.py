@@ -86,10 +86,23 @@ class AssemblyExecutor:
                 part.suggested_params = {}
             try:
                 scad, builder = self._build_and_render(plan, output_path)
-            except Exception as e:
-                raise AssemblyExecutionError(
-                    f"Assembly execution failed: {e}"
-                ) from e
+            except Exception as second_err:
+                # Last resort: drop orphaned parts (disconnected from root) so
+                # the rest of the assembly still renders instead of crashing.
+                dropped = self._drop_orphans(plan)
+                if not dropped:
+                    raise AssemblyExecutionError(
+                        f"Assembly execution failed: {second_err}"
+                    ) from second_err
+                clamp_warnings.append(
+                    f"Dropped orphaned parts to recover: {', '.join(dropped)}"
+                )
+                try:
+                    scad, builder = self._build_and_render(plan, output_path)
+                except Exception as e:
+                    raise AssemblyExecutionError(
+                        f"Assembly execution failed: {e}"
+                    ) from e
 
         return AssemblyResult(
             scad_code=scad,
@@ -98,6 +111,41 @@ class AssemblyExecutor:
             warnings=clamp_warnings + builder.warnings,
             success=True,
         )
+
+    def _drop_orphans(self, plan: AssemblyPlan) -> list[str]:
+        """Remove parts not reachable from the root via connections.
+
+        Returns the part_ids that were dropped.
+        """
+        if not plan.parts:
+            return []
+
+        root = plan.root_part or plan.parts[0].part_id
+        adj: dict[str, set[str]] = {p.part_id: set() for p in plan.parts}
+        for conn in plan.connections:
+            if conn.from_part in adj and conn.to_part in adj:
+                adj[conn.from_part].add(conn.to_part)
+                adj[conn.to_part].add(conn.from_part)
+
+        reachable = {root}
+        stack = [root]
+        while stack:
+            cur = stack.pop()
+            for nb in adj.get(cur, ()):
+                if nb not in reachable:
+                    reachable.add(nb)
+                    stack.append(nb)
+
+        orphans = [p.part_id for p in plan.parts if p.part_id not in reachable]
+        if not orphans:
+            return []
+
+        plan.parts = [p for p in plan.parts if p.part_id in reachable]
+        plan.connections = [
+            c for c in plan.connections
+            if c.from_part in reachable and c.to_part in reachable
+        ]
+        return orphans
 
     def _build_and_render(
         self, plan: AssemblyPlan, output_path: str

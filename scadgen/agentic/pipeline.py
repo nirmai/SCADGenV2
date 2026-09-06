@@ -102,7 +102,10 @@ def run_pipeline(
     _log(verbose, "[4/5] Refining connections")
     planner = ConnectionPlanner(provider, registry)
     plan = planner.refine(plan)
-    _log(verbose, "  -> All connections validated")
+    for w in planner.warnings:
+        _log(verbose, f"  ~ {w}")
+    warnings.extend(planner.warnings)
+    _log(verbose, f"  -> {len(plan.connections)} connections resolved")
 
     _log(verbose, "[5/5] Executing assembly")
     executor = AssemblyExecutor(engine)
