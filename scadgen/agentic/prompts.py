@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 def build_decomposition_prompt(
     description: str,
     templates: list[Template],
+    has_image: bool = False,
 ) -> tuple[str, str]:
     """Build system + user prompt for the decomposition stage.
 
@@ -24,18 +25,39 @@ def build_decomposition_prompt(
         "OpenSCAD template — either an existing one from the catalog, or a new "
         "one you propose."
     )
+    if has_image:
+        system += (
+            " A reference image is provided. Study it carefully and make the "
+            "assembly match what you see — the parts present, their shapes, "
+            "their relative sizes, their vertical stacking order, and colors."
+        )
 
     catalog = _build_template_catalog(templates)
 
-    user = f"""{catalog}
+    image_note = ""
+    if has_image:
+        image_note = (
+            "\n## Reference Image\n"
+            "A reference image is attached. Base the decomposition on it: "
+            "identify each distinct part you see, estimate its proportions, "
+            "and reproduce the stacking order and colors from the image.\n"
+        )
 
+    user = f"""{catalog}
+{image_note}
 ## User Request
 "{description}"
 
 ## Instructions
 Decompose this object into individual parts. For each part:
 - Choose an existing template from the catalog if one fits
-- Otherwise propose a new template_id (lowercase, underscored)
+- Otherwise INVENT a specific, descriptive new template_id (lowercase,
+  underscored) that names the actual part — e.g. "cage_body", "bird_perch",
+  "lamp_shade". This new template will be generated for you.
+- NEVER use a vague placeholder as a template name: no "primitive",
+  "part", "shape", "custom", "generic", "not_defined", "tbd", or similar.
+  Every suggested_template must be either a real catalog id or a concrete
+  new part name.
 - Set reasonable parameter values based on the description
 - Assign a functional role
 

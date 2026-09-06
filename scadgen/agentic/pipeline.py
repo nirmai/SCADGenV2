@@ -23,14 +23,24 @@ def run_pipeline(
     max_retries: int = 3,
     dry_run: bool = False,
     verbose: bool = False,
+    image_path: str = "",
 ) -> AssemblyResult:
     """Run the full agentic assembly pipeline."""
     provider = create_provider(engine.config)
     registry = engine.registry
 
+    image = None
+    if image_path:
+        from scadgen.nlp.providers import ImageInput
+        if not provider.supports_vision():
+            _log(verbose, f"  ! Provider does not support images; ignoring {image_path}")
+        else:
+            image = ImageInput.from_path(image_path)
+            _log(verbose, f"  + Using reference image: {image_path}")
+
     _log(verbose, f"[1/5] Decomposing: \"{description}\"")
     decomposer = AssemblyDecomposer(provider, registry)
-    plan = decomposer.decompose(description)
+    plan = decomposer.decompose(description, image=image)
     _log(verbose, f"  -> {len(plan.parts)} parts, {len(plan.connections)} connections")
     for p in plan.parts:
         _log(verbose, f"    - {p.part_id} ({p.suggested_template}): {p.description}")

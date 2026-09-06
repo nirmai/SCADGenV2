@@ -9,7 +9,7 @@ from scadgen.agentic.types import AssemblyPlan, ConnectionSpec, PartSpec
 from scadgen.core.template_registry import TemplateRegistry
 from scadgen.exceptions import DecompositionError
 from scadgen.nlp.json_utils import parse_json_response
-from scadgen.nlp.providers import LLMProvider
+from scadgen.nlp.providers import ImageInput, LLMProvider
 
 
 class AssemblyDecomposer:
@@ -17,10 +17,14 @@ class AssemblyDecomposer:
         self._provider = provider
         self._registry = registry
 
-    def decompose(self, description: str) -> AssemblyPlan:
+    def decompose(
+        self, description: str, image: ImageInput | None = None,
+    ) -> AssemblyPlan:
         templates = self._registry.list_templates()
-        system, user = build_decomposition_prompt(description, templates)
-        raw = self._provider.chat(user, system=system)
+        system, user = build_decomposition_prompt(
+            description, templates, has_image=image is not None,
+        )
+        raw = self._provider.chat(user, system=system, image=image)
 
         try:
             data = parse_json_response(raw)

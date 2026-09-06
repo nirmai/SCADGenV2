@@ -45,6 +45,8 @@ def main(argv: list[str] | None = None) -> None:
     asm.add_argument("description", help="Natural language description of the assembly")
     asm.add_argument("--output", "-o", default="", help="Output .scad file path")
     asm.add_argument("--output-dir", default="output", help="Output directory")
+    asm.add_argument("--image", "-i", default="",
+                     help="Reference image to match (PNG/JPEG/GIF/WebP)")
     asm.add_argument("--provider", default="auto",
                      choices=["auto", "ollama", "openai", "anthropic"])
     asm.add_argument("--dry-run", action="store_true", help="Show plan without executing")
@@ -235,6 +237,10 @@ def _cmd_assemble(args: argparse.Namespace) -> None:
 
     engine = SCADEngine(provider=args.provider)
 
+    if args.image and not Path(args.image).is_file():
+        print(f"Error: image not found: {args.image}", file=sys.stderr)
+        sys.exit(1)
+
     try:
         result = assemble(
             description=args.description,
@@ -243,6 +249,7 @@ def _cmd_assemble(args: argparse.Namespace) -> None:
             output_dir=args.output_dir,
             dry_run=args.dry_run,
             verbose=args.verbose,
+            image_path=args.image,
         )
     except AgenticError as e:
         print(f"Assembly error: {e}", file=sys.stderr)

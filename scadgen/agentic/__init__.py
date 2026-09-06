@@ -17,6 +17,7 @@ def assemble(
     max_retries: int = 3,
     dry_run: bool = False,
     verbose: bool = False,
+    image_path: str = "",
 ) -> AssemblyResult:
     """Full agentic assembly pipeline: NL description → .scad assembly file."""
     from scadgen.agentic.pipeline import run_pipeline
@@ -29,4 +30,5 @@ def assemble(
         max_retries=max_retries,
         dry_run=dry_run,
         verbose=verbose,
+        image_path=image_path,
     )

@@ -30,7 +30,7 @@ class MockProvider(LLMProvider):
         self._call_idx = 0
         self.calls: list[tuple[str, str]] = []
 
-    def chat(self, prompt: str, system: str = "", max_tokens: int = 0) -> str:
+    def chat(self, prompt: str, system: str = "", max_tokens: int = 0, image=None) -> str:
         self.calls.append((prompt, system))
         if self._call_idx < len(self._responses):
             resp = self._responses[self._call_idx]
@@ -657,6 +657,60 @@ class TestAnthropicProvider(unittest.TestCase):
         from scadgen.nlp.providers import AnthropicProvider
         p = AnthropicProvider(api_key="")
         self.assertFalse(p.is_available())
+
+    def test_supports_vision(self):
+        from scadgen.nlp.providers import AnthropicProvider, OllamaProvider
+        self.assertTrue(AnthropicProvider(api_key="k").supports_vision())
+        self.assertFalse(OllamaProvider().supports_vision())
+
+
+# ── Vision / image input tests ───────────────────────────────────────────
+
+
+class TestImageInput(unittest.TestCase):
+    # 1x1 transparent PNG
+    _PNG = bytes.fromhex(
+        "89504e470d0a1a0a0000000d494844520000000100000001080600000"
+        "01f15c4890000000d49444154789c6360000002000154a24f9f0000000"
+        "049454e44ae426082"
+    )
+
+    def test_load_png_from_path(self):
+        from scadgen.nlp.providers import ImageInput
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "ref.png"
+            p.write_bytes(self._PNG)
+            img = ImageInput.from_path(str(p))
+            self.assertEqual(img.media_type, "image/png")
+            self.assertTrue(len(img.data_b64) > 0)
+
+    def test_unsupported_type_raises(self):
+        from scadgen.nlp.providers import ImageInput
+        from scadgen.exceptions import ProviderError
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "ref.bmp"
+            p.write_bytes(b"bmpdata")
+            with self.assertRaises(ProviderError):
+                ImageInput.from_path(str(p))
+
+    def test_decomposer_passes_image_to_provider(self):
+        from scadgen.nlp.providers import ImageInput
+        img = ImageInput(data_b64="abc", media_type="image/png")
+
+        class VisionMock(MockProvider):
+            def __init__(self):
+                super().__init__([DECOMPOSE_RESPONSE])
+                self.image_seen = None
+
+            def chat(self, prompt, system="", max_tokens=0, image=None):
+                self.image_seen = image
+                return super().chat(prompt, system, max_tokens)
+
+        engine = SCADEngine()
+        provider = VisionMock()
+        decomposer = AssemblyDecomposer(provider, engine.registry)
+        decomposer.decompose("a lamp", image=img)
+        self.assertIs(provider.image_seen, img)
 
 
 # ── CLI assemble subcommand tests ────────────────────────────────────────
