@@ -10,6 +10,7 @@ build/
 .venv/
 venv/
 generated_scad/
+output/
 *.log
 .ruff_cache/
 .pytest_cache/

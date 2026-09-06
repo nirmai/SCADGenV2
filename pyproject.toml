@@ -1,14 +1,22 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "scadgen"
 version = "0.1.0"
 description = "AI-powered parametric OpenSCAD generator with engineering knowledge"
+readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [{name = "nirmai", email = "nirmai.puthan@gmail.com"}]
+keywords = ["openscad", "cad", "parametric", "llm", "agentic", "codegen", "3d-printing"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+]
 
 dependencies = [
     "requests>=2.28.0",
@@ -16,8 +24,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+anthropic = ["anthropic>=0.30"]
 openai = ["openai>=1.0"]
 dev = ["pytest>=7.0", "ruff>=0.4"]
+
+[project.urls]
+Repository = "https://github.com/nirmai/SCADGenV2"
 
 [project.scripts]
 scadgen = "scadgen.cli:main"
