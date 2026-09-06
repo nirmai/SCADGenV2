@@ -52,6 +52,14 @@ def main(argv: list[str] | None = None) -> None:
     asm.add_argument("--dry-run", action="store_true", help="Show plan without executing")
     asm.add_argument("-v", "--verbose", action="store_true")
 
+    # clear-generated
+    clr = subparsers.add_parser(
+        "clear-generated",
+        help="Clear the persistent cache of LLM-generated templates",
+    )
+    clr.add_argument("--yes", "-y", action="store_true",
+                      help="Actually delete (otherwise just reports what would be removed)")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -66,6 +74,8 @@ def main(argv: list[str] | None = None) -> None:
         _cmd_info(args)
     elif args.command == "assemble":
         _cmd_assemble(args)
+    elif args.command == "clear-generated":
+        _cmd_clear_generated(args)
 
 
 def _cmd_interactive(args: argparse.Namespace) -> None:
@@ -172,6 +182,16 @@ def _cmd_generate(args: argparse.Namespace) -> None:
         print(f"Warning: {w}", file=sys.stderr)
 
 
+def _is_generated_template(tmpl, engine) -> bool:
+    """Whether a template lives in the persistent generated-templates cache
+    rather than the packaged/curated template directories."""
+    try:
+        gen_dir = Path(engine.config.generated_templates_dir).resolve()
+        return gen_dir in Path(tmpl.file_path).resolve().parents
+    except OSError:
+        return False
+
+
 def _cmd_list(args: argparse.Namespace) -> None:
     from scadgen.core.engine import SCADEngine
 
@@ -185,7 +205,9 @@ def _cmd_list(args: argparse.Namespace) -> None:
     max_id = max(len(t.template_id) for t in templates)
     for t in templates:
         cat = f"[{t.category}]" if t.category else ""
-        print(f"  {t.template_id:<{max_id}}  {t.description:<45} {cat}")
+        tag = "[generated]" if _is_generated_template(t, engine) else ""
+        suffix = " ".join(x for x in (cat, tag) if x)
+        print(f"  {t.template_id:<{max_id}}  {t.description:<45} {suffix}")
 
 
 def _cmd_info(args: argparse.Namespace) -> None:
@@ -198,7 +220,9 @@ def _cmd_info(args: argparse.Namespace) -> None:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
+    source = "generated" if _is_generated_template(tmpl, engine) else "built-in"
     print(f"Template: {tmpl.template_id}")
+    print(f"Source:   {source}")
     print(f"Module:   {tmpl.module_name}")
     print(f"Category: {tmpl.category}")
     print(f"Description: {tmpl.description}")
@@ -228,6 +252,28 @@ def _cmd_info(args: argparse.Namespace) -> None:
         print("Derived values:")
         for name, expr in tmpl.derived_expressions.items():
             print(f"  {name} = {expr}")
+
+
+def _cmd_clear_generated(args: argparse.Namespace) -> None:
+    from scadgen.config import Config
+
+    gen_dir = Path(Config.load().generated_templates_dir)
+    scad_files = sorted(gen_dir.glob("*.scad")) if gen_dir.is_dir() else []
+
+    if not scad_files:
+        print(f"No generated templates found in {gen_dir}")
+        return
+
+    if not args.yes:
+        print(f"Would remove {len(scad_files)} generated template(s) from {gen_dir}:")
+        for f in scad_files:
+            print(f"  {f.name}")
+        print("Re-run with --yes to actually delete.")
+        return
+
+    for f in scad_files:
+        f.unlink()
+    print(f"Removed {len(scad_files)} generated template(s) from {gen_dir}")
 
 
 def _cmd_assemble(args: argparse.Namespace) -> None:

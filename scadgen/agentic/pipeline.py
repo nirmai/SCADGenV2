@@ -96,9 +96,12 @@ def run_pipeline(
             )
         _log(verbose, f"  + OpenSCAD render-check: {openscad_bin}")
         # Generated templates are OUTPUTS, not part of the packaged template
-        # library — write them under the output dir so the source stays clean.
-        # They are still registered in-session, so assembly works immediately.
-        template_dir = Path(output_dir) / "generated_templates"
+        # library, but they persist in a stable cache dir (not the per-run
+        # output dir) so a later run asking for the same novel part reuses
+        # it instead of regenerating from scratch. Reuse is automatic: the
+        # registry scans this dir at startup, so TemplateInventory's normal
+        # exact/fuzzy match finds it like any other template.
+        template_dir = Path(engine.config.generated_templates_dir)
         generator = TemplateGenerator(
             provider, registry, template_dir, max_retries=max_retries,
             openscad_bin=openscad_bin,

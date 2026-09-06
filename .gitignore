@@ -10,6 +10,7 @@ build/
 .venv/
 venv/
 generated_scad/
+generated_templates/
 output/
 *.log
 .ruff_cache/

@@ -15,12 +15,14 @@ class Config:
     anthropic_model: str = "claude-sonnet-5"
     anthropic_api_key: str = ""
     template_dirs: list[str] = field(default_factory=list)
+    generated_templates_dir: str = ""
     output_dir: str = ""
     openscad_path: str = ""
 
     @classmethod
     def load(cls) -> Config:
         pkg_templates = str(Path(__file__).parent / "templates")
+        default_generated_dir = str(Path(__file__).parent.parent / "generated_templates")
 
         config = cls(
             provider=os.environ.get("SCADGEN_PROVIDER", "auto"),
@@ -31,6 +33,9 @@ class Config:
             anthropic_model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
             anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
             template_dirs=[pkg_templates],
+            generated_templates_dir=os.environ.get(
+                "SCADGEN_GENERATED_DIR", default_generated_dir
+            ),
             output_dir=os.environ.get("SCADGEN_OUTPUT_DIR", ""),
             openscad_path=os.environ.get("OPENSCAD_PATH", ""),
         )
@@ -38,5 +43,10 @@ class Config:
         extra_dirs = os.environ.get("SCADGEN_TEMPLATE_DIRS", "")
         if extra_dirs:
             config.template_dirs.extend(extra_dirs.split(os.pathsep))
+
+        # Generated templates persist across runs in their own cache dir,
+        # always scanned last so curated templates take precedence on any
+        # id collision (see TemplateRegistry._scan_directory).
+        config.template_dirs.append(config.generated_templates_dir)
 
         return config

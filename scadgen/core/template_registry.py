@@ -55,16 +55,36 @@ class TemplateRegistry:
         return tmpl
 
     def _scan_directory(self, directory: Path) -> None:
+        """Load every .scad template in a directory.
+
+        Within this directory, later files still overwrite earlier ones on a
+        collision (unchanged from before — some built-in templates
+        deliberately share an alias, e.g. both hex_bolt and
+        socket_head_cap_screw declare "cap screw", and the later one wins).
+
+        Across directories, the FIRST directory scanned wins: template_dirs
+        is scanned in order (curated first, the persistent generated-
+        templates cache last — see Config.load()), so a stale generated file
+        can never shadow a built-in template of the same id.
+        """
         if not directory.is_dir():
             return
+
+        local_templates: dict[str, Template] = {}
+        local_aliases: dict[str, str] = {}
         for scad_file in sorted(directory.glob("*.scad")):
             try:
                 template = self._parse_template(scad_file)
-                self._templates[template.template_id] = template
+                local_templates[template.template_id] = template
                 for alias in template.aliases:
-                    self._alias_map[alias.lower()] = template.template_id
+                    local_aliases[alias.lower()] = template.template_id
             except TemplateParseError:
                 pass
+
+        for tid, template in local_templates.items():
+            self._templates.setdefault(tid, template)
+        for alias, tid in local_aliases.items():
+            self._alias_map.setdefault(alias, tid)
 
     def _parse_template(self, path: Path) -> Template:
         source = path.read_text(encoding="utf-8")
