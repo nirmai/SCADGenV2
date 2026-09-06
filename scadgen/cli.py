@@ -233,7 +233,7 @@ def _cmd_info(args: argparse.Namespace) -> None:
 def _cmd_assemble(args: argparse.Namespace) -> None:
     from scadgen.agentic import assemble
     from scadgen.core.engine import SCADEngine
-    from scadgen.exceptions import AgenticError
+    from scadgen.exceptions import AgenticError, ProviderError, ProviderUnavailableError
 
     engine = SCADEngine(provider=args.provider)
 
@@ -251,6 +251,27 @@ def _cmd_assemble(args: argparse.Namespace) -> None:
             verbose=args.verbose,
             image_path=args.image,
         )
+    except ProviderUnavailableError as e:
+        print(f"LLM provider unavailable: {e}", file=sys.stderr)
+        sys.exit(1)
+    except ProviderError as e:
+        msg = str(e)
+        if "credit balance is too low" in msg or "billing" in msg.lower():
+            print(
+                "LLM request rejected: your Anthropic API account is out of credits.\n"
+                "Add credits at console.anthropic.com (Plans & Billing), or use a\n"
+                "different provider: --provider ollama (local) or --provider openai.",
+                file=sys.stderr,
+            )
+        elif "401" in msg or "authentication" in msg.lower():
+            print(
+                "LLM request rejected: invalid or missing API key. Check your\n"
+                "ANTHROPIC_API_KEY / OPENAI_API_KEY environment variable.",
+                file=sys.stderr,
+            )
+        else:
+            print(f"LLM request failed: {msg}", file=sys.stderr)
+        sys.exit(1)
     except AgenticError as e:
         print(f"Assembly error: {e}", file=sys.stderr)
         sys.exit(1)
