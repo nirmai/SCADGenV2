@@ -101,7 +101,7 @@ class OllamaProvider(LLMProvider):
 
 
 class AnthropicProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, api_key: str, model: str = "claude-sonnet-5"):
         self.api_key = api_key
         self.model = model
         self._client = None
@@ -137,9 +137,18 @@ class AnthropicProvider(LLMProvider):
 
         try:
             resp = client.messages.create(**kwargs)
-            return resp.content[0].text
         except Exception as e:
             raise ProviderError(f"Anthropic request failed: {e}") from e
+
+        # Extended-thinking models may prepend a ThinkingBlock (or other
+        # non-text block) before the actual text block — find the text one.
+        for block in resp.content:
+            if getattr(block, "type", None) == "text":
+                return block.text
+        raise ProviderError(
+            "Anthropic response contained no text block "
+            f"(block types: {[getattr(b, 'type', '?') for b in resp.content]})"
+        )
 
     def is_available(self) -> bool:
         return bool(self.api_key)

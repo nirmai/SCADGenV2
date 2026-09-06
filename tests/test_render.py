@@ -63,12 +63,24 @@ class TestGeneratorRenderPlumbing(unittest.TestCase):
         from scadgen.agentic.template_generator import TemplateGenerator
 
         original = tg.check_scad
-        tg.check_scad = lambda code, binp: ["ERROR: boom"]
+        tg.check_scad = lambda code, binp, timeout=30: ["ERROR: boom"]
         try:
             g = TemplateGenerator(None, None, Path("x"), openscad_bin="/fake/openscad")
             self.assertEqual(g._render_errors("code"), ["ERROR: boom"])
         finally:
             tg.check_scad = original
+
+    def test_failed_attempt_saved_for_debugging(self):
+        from scadgen.agentic.template_generator import TemplateGenerator
+
+        with tempfile.TemporaryDirectory() as d:
+            g = TemplateGenerator(None, None, Path(d), openscad_bin=None)
+            g._save_failed_attempt("cage_dome", 0, "module cage_dome() {}", ["some error"])
+            saved = Path(d) / "_failed" / "cage_dome_attempt1.scad"
+            self.assertTrue(saved.is_file())
+            content = saved.read_text(encoding="utf-8")
+            self.assertIn("some error", content)
+            self.assertIn("module cage_dome", content)
 
 
 if __name__ == "__main__":

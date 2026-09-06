@@ -777,6 +777,53 @@ class TestAnthropicProvider(unittest.TestCase):
         self.assertTrue(OllamaProvider(model="llava").supports_vision())
         self.assertTrue(OllamaProvider(model="llama3.2-vision").supports_vision())
 
+    def test_chat_skips_leading_thinking_block(self):
+        """Extended-thinking models may prepend a non-text block; chat()
+        must find the actual text block rather than assuming content[0]."""
+        from scadgen.nlp.providers import AnthropicProvider
+
+        class FakeBlock:
+            def __init__(self, type_, text=None):
+                self.type = type_
+                if text is not None:
+                    self.text = text
+
+        class FakeResponse:
+            content = [FakeBlock("thinking"), FakeBlock("text", text="hello world")]
+
+        class FakeMessages:
+            def create(self, **kwargs):
+                return FakeResponse()
+
+        class FakeClient:
+            messages = FakeMessages()
+
+        p = AnthropicProvider(api_key="k")
+        p._client = FakeClient()
+        self.assertEqual(p.chat("hi"), "hello world")
+
+    def test_chat_raises_clear_error_when_no_text_block(self):
+        from scadgen.exceptions import ProviderError
+        from scadgen.nlp.providers import AnthropicProvider
+
+        class FakeBlock:
+            type = "thinking"
+
+        class FakeResponse:
+            content = [FakeBlock()]
+
+        class FakeMessages:
+            def create(self, **kwargs):
+                return FakeResponse()
+
+        class FakeClient:
+            messages = FakeMessages()
+
+        p = AnthropicProvider(api_key="k")
+        p._client = FakeClient()
+        with self.assertRaises(ProviderError):
+            p.chat("hi")
+
 
 # ── Vision / image input tests ───────────────────────────────────────────
 

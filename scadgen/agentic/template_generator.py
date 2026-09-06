@@ -79,6 +79,7 @@ class TemplateGenerator:
                 return self._save_and_register(part.suggested_template, code)
 
             last_errors = errors
+            self._save_failed_attempt(part.suggested_template, attempt, code, errors)
 
             if attempt < self._max_retries - 1:
                 repair_system, repair_user = build_repair_prompt(code, errors)
@@ -94,14 +95,35 @@ class TemplateGenerator:
 
         No binary configured → skip (empty). If the checker itself errors
         unexpectedly, fail closed (report an error) so unvalidated code is
-        never saved as if it rendered.
+        never saved as if it rendered. Complex generated geometry (loops of
+        boolean ops, e.g. a domed lattice) can legitimately take longer than
+        a quick sanity check, especially on older OpenSCAD CGAL backends —
+        use a generous timeout here.
         """
         if not self._openscad_bin:
             return []
         try:
-            return check_scad(code, self._openscad_bin)
+            return check_scad(code, self._openscad_bin, timeout=120)
         except FileNotFoundError:
             return []
+
+    def _save_failed_attempt(
+        self, template_id: str, attempt: int, code: str, errors: list[str],
+    ) -> None:
+        """Preserve a failed generation attempt for debugging.
+
+        Failures are otherwise silent — the broken code is discarded and only
+        the error strings survive. Saving each attempt lets a human inspect
+        what the LLM actually wrote when generation exhausts its retries.
+        """
+        try:
+            debug_dir = self._template_dir / "_failed"
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            path = debug_dir / f"{template_id}_attempt{attempt + 1}.scad"
+            header = "// GENERATION FAILED:\n" + "\n".join(f"// - {e}" for e in errors) + "\n\n"
+            path.write_text(header + code, encoding="utf-8")
+        except OSError:
+            pass  # best-effort debug artifact; never let this break generation
         except Exception as e:  # noqa: BLE001 - fail closed on checker malfunction
             return [f"OpenSCAD render-check failed to run: {e}"]
 
