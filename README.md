@@ -5,7 +5,7 @@
 SCADGen is an AI-powered CAD generator. Describe an object in plain English — *"make a desk lamp"*, *"build a 4-cylinder engine top end"* — and an agentic pipeline decomposes it into parts, generates any templates it's missing, plans how the parts connect, and emits a ready-to-render `.scad` file.
 
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
-![Tests](https://img.shields.io/badge/tests-366%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-375%20passing-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![OpenSCAD](https://img.shields.io/badge/output-OpenSCAD-orange.svg)
 
@@ -17,7 +17,7 @@ SCADGen is an AI-powered CAD generator. Describe an object in plain English — 
 
 > <img width="524" height="370" alt="Screenshot 2026-09-05 204534" src="https://github.com/user-attachments/assets/1958cc18-9ae4-4abd-b9bc-e543b65fde98" />
 
-> A birdcage from the prompt *"a birdcage with a domed top and vertical bars"* — no birdcage template existed; the dome was written from scratch by the LLM, OpenSCAD-verified, and assembled with a base, radial bars, a ring, and a finial. See [`examples/birdcage.scad`]
+> A birdcage from the prompt *"a birdcage with a domed top and vertical bars"* — no birdcage template existed; the dome was written from scratch by the LLM, OpenSCAD-verified, and assembled with a base, radial bars, a ring, and a finial. See [`examples/birdcage.scad`](examples/birdcage.scad).
 
 <img width="317" height="286" alt="Screenshot 2026-09-06 104425" src="https://github.com/user-attachments/assets/e171e84c-d8df-4783-9b08-78b9d37d1e7b" />
 
@@ -135,7 +135,7 @@ scadgen/
 └── templates/    # 28 parametric .scad templates with metadata
 ```
 
-- **~6,000 lines of Python**, **366 tests**
+- **~6,300 lines of Python**, **375 tests**
 - Templates are plain `.scad` files with a `SCADGEN_META` YAML header — add a new part by dropping in a file; no code changes
 - LLM-agnostic: swap providers via config or `--provider`
 
@@ -145,16 +145,16 @@ scadgen/
 
 SCADGen has a **robust, working pipeline** — it reliably produces valid, correctly-positioned assemblies and never crashes on bad model output. Genuinely novel objects with no matching template (a birdcage with a domed lattice top) are now decomposed, generated from scratch, and OpenSCAD-render-verified end to end — see [`examples/birdcage.scad`](examples/birdcage.scad).
 
+Generated templates now persist across runs too: successful generations are cached in a dedicated `generated_templates/` directory (separate from the curated library, `SCADGEN_GENERATED_DIR`-overridable), so asking for the same novel object twice reuses the first result instead of regenerating it. `scadgen list`/`info` tag cached templates as `[generated]`; `scadgen clear-generated` resets the cache.
+
 Known limitations, honestly:
 
 - **Generation fidelity varies with model capability** — a frontier model (Claude, GPT-4o) reliably produces real, structured geometry for novel parts; smaller local models tend to fall back to plain primitives instead of using the pattern/custom-generation machinery
 - **No feedback loop** — the system verifies that generated geometry *renders*, but doesn't yet look at *what* it rendered to critique and improve it
-- **No persistence** — generated templates aren't carried forward into the library across runs, so the same novel object is regenerated from scratch each time
 
 Planned next steps:
 
 - [ ] Render → vision-critique → regenerate loop (compare the actual render against the request/reference image)
-- [ ] Persist generated templates into the library across runs
 - [ ] Push decomposition further toward generation on weaker/local models
 - [ ] Final-assembly render-check, not just per-template
 
