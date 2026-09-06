@@ -76,8 +76,15 @@ SCADGen isn't a dumb shape printer — templates carry real engineering metadata
 | **Sealing** | gasket |
 
 ---
+## Example Output
 
+<img width="350" height="419" alt="Screenshot 2026-09-05 210330" src="https://github.com/user-attachments/assets/76d75309-fe4d-4afd-8a1a-dd2dc78351d1" />
+
+
+<img width="524" height="370" alt="Screenshot 2026-09-05 204534" src="https://github.com/user-attachments/assets/1958cc18-9ae4-4abd-b9bc-e543b65fde98" />
+---
 ## Quickstart
+
 
 ```bash
 # install
