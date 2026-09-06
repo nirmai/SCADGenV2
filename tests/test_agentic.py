@@ -579,7 +579,7 @@ class TestPipelineIntegration(unittest.TestCase):
         import scadgen.agentic.pipeline as pipeline_mod
         original_create = pipeline_mod.create_provider
         provider = MockProvider([decompose_resp])
-        pipeline_mod.create_provider = lambda cfg: provider
+        pipeline_mod.create_provider = lambda cfg, prefer_vision=False: provider
 
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -626,7 +626,7 @@ class TestPipelineIntegration(unittest.TestCase):
         original_create = pipeline_mod.create_provider
         # No successful template generation: 'not_defined' stays unresolved.
         provider = MockProvider([decompose_resp, "invalid scad", "invalid", "invalid"])
-        pipeline_mod.create_provider = lambda cfg: provider
+        pipeline_mod.create_provider = lambda cfg, prefer_vision=False: provider
 
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
