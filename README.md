@@ -4,6 +4,8 @@
 
 SCADGen is an AI-powered CAD generator. Describe an object in plain English — *"make a desk lamp"*, *"build a 4-cylinder engine top end"* — and an agentic pipeline decomposes it into parts, generates any templates it's missing, plans how the parts connect, and emits a ready-to-render `.scad` file.
 
+**The template library grows with use** — ask for something it doesn't have (a birdcage, a spoked wheel) and it gets generated, OpenSCAD-verified, and kept for next time.
+
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
 ![Tests](https://img.shields.io/badge/tests-375%20passing-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -13,7 +15,7 @@ SCADGen is an AI-powered CAD generator. Describe an object in plain English — 
 
 > <img width="350" height="419" alt="Screenshot 2026-09-05 210330" src="https://github.com/user-attachments/assets/8633fc03-0328-49ac-a0c4-2b952fd43ab4" />
 
-> A simple 2 piston Engine from the prompt: *"make a simple 2 piston engine*" — engine block, flywheel, gasket, and pistons (inside block) all positioned by the assembly solver
+> A simple 2 piston Engine from the prompt: *"make a simple 2 piston engine"* — engine block, flywheel, gasket, and pistons (inside block) all positioned by the assembly solver
 
 > <img width="524" height="370" alt="Screenshot 2026-09-05 204534" src="https://github.com/user-attachments/assets/1958cc18-9ae4-4abd-b9bc-e543b65fde98" />
 
@@ -24,7 +26,6 @@ SCADGen is an AI-powered CAD generator. Describe an object in plain English — 
 High-res birdcage dome:
 
 <img width="334" height="209" alt="Screenshot 2026-09-06 115131" src="https://github.com/user-attachments/assets/f075941c-7ac8-4cfa-bd59-3e4047150396" />
-
 
 ---
 
@@ -78,7 +79,7 @@ SCADGen isn't a dumb shape printer — templates carry real engineering metadata
 - **Parameter harmonization** — linked dimensions stay consistent (a cylinder head's bore matches its block's)
 - **Connectors** — named, expression-driven attachment points (`origin: [0, 0, "height"]`) that let parts mate and stack correctly
 
-## Template library — 28 parametric parts
+## Template library — 28 curated parts, growing with use
 
 | Category | Templates |
 |---|---|
@@ -89,10 +90,11 @@ SCADGen isn't a dumb shape printer — templates carry real engineering metadata
 | **Lamp** | lamp_base, lamp_arm, lamp_shade |
 | **Sealing** | gasket |
 
+These 28 ship with the repo. Anything the library doesn't have gets written by the LLM and OpenSCAD-verified on the spot, then kept in a separate generated-templates cache for reuse — e.g. `cage_dome`, made entirely from the prompt *"a birdcage with a domed top and vertical bars"* (see [`examples/birdcage.scad`](examples/birdcage.scad)). `scadgen list` tags cache entries `[generated]` so provenance stays clear.
+
 ---
 
 ## Quickstart
-
 
 ```bash
 # install
@@ -143,9 +145,7 @@ scadgen/
 
 ## Current status & roadmap
 
-SCADGen has a **robust, working pipeline** — it reliably produces valid, correctly-positioned assemblies and never crashes on bad model output. Genuinely novel objects with no matching template (a birdcage with a domed lattice top) are now decomposed, generated from scratch, and OpenSCAD-render-verified end to end — see [`examples/birdcage.scad`](examples/birdcage.scad).
-
-Generated templates now persist across runs too: successful generations are cached in a dedicated `generated_templates/` directory (separate from the curated library, `SCADGEN_GENERATED_DIR`-overridable), so asking for the same novel object twice reuses the first result instead of regenerating it. `scadgen list`/`info` tag cached templates as `[generated]`; `scadgen clear-generated` resets the cache.
+SCADGen has a **robust, working pipeline** — it reliably produces valid, correctly-positioned assemblies and never crashes on bad model output, and its template library compounds over time rather than staying fixed (see "Template library" above). The generated-templates cache lives in `generated_templates/` (`SCADGEN_GENERATED_DIR`-overridable); `scadgen clear-generated` resets it.
 
 Known limitations, honestly:
 
