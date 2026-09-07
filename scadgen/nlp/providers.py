@@ -43,8 +43,16 @@ class LLMProvider(ABC):
     @abstractmethod
     def chat(
         self, prompt: str, system: str = "", max_tokens: int = 0,
-        image: ImageInput | None = None,
-    ) -> str: ...
+        image: ImageInput | None = None, thinking: bool = True,
+    ) -> str:
+        """Send a prompt and return the model's text response.
+
+        `thinking` asks for extended reasoning where the provider supports
+        it. Turn it off for structured output (JSON) where reasoning tokens
+        only compete with the answer for the token budget; leave it on for
+        open-ended generation. Providers without extended thinking ignore it.
+        """
+        ...
 
     @abstractmethod
     def is_available(self) -> bool: ...
@@ -70,8 +78,9 @@ class OllamaProvider(LLMProvider):
 
     def chat(
         self, prompt: str, system: str = "", max_tokens: int = 0,
-        image: ImageInput | None = None,
+        image: ImageInput | None = None, thinking: bool = True,
     ) -> str:
+        """`thinking` is ignored — Ollama has no extended-thinking control."""
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -100,6 +109,28 @@ class OllamaProvider(LLMProvider):
             return False
 
 
+def _describe_response(resp) -> str:
+    """Summarize why a response carried no text block.
+
+    stop_reason='max_tokens' means the output was truncated; thinking_tokens
+    shows how much of the budget reasoning consumed.
+    """
+    parts = [f"stop_reason={getattr(resp, 'stop_reason', '?')}"]
+
+    usage = getattr(resp, "usage", None)
+    if usage is not None:
+        parts.append(f"output_tokens={getattr(usage, 'output_tokens', '?')}")
+        details = getattr(usage, "output_tokens_details", None)
+        if details is not None:
+            parts.append(
+                f"thinking_tokens={getattr(details, 'thinking_tokens', '?')}"
+            )
+
+    block_types = [getattr(b, "type", "?") for b in getattr(resp, "content", [])]
+    parts.append(f"blocks={block_types}")
+    return ", ".join(parts)
+
+
 def _thinking_budget(max_tokens: int) -> int:
     """Tokens to allow extended thinking, reserving the rest for the answer.
 
@@ -121,7 +152,7 @@ class AnthropicProvider(LLMProvider):
 
     def chat(
         self, prompt: str, system: str = "", max_tokens: int = 0,
-        image: ImageInput | None = None,
+        image: ImageInput | None = None, thinking: bool = True,
     ) -> str:
         client = self._get_client()
 
@@ -149,37 +180,51 @@ class AnthropicProvider(LLMProvider):
         if system:
             kwargs["system"] = system
 
-        # Cap how much of the budget extended thinking may consume, so the
-        # remainder is reserved for the actual answer. Without this, a model
-        # can spend the whole budget reasoning and return a response with no
-        # text block at all (observed live on complex prompts).
-        thinking_budget = _thinking_budget(budget)
+        # Thinking configs to try, in order. Each rung handles a distinct
+        # failure: reasoning crowding out the answer, then a model/API that
+        # doesn't recognize the parameter at all. Note that omitting the
+        # parameter does NOT disable thinking — the API's default is ON —
+        # so "disabled" has to be sent explicitly.
+        attempts: list[dict | None] = []
+        thinking_budget = _thinking_budget(budget) if thinking else 0
         if thinking_budget:
-            kwargs["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
+            # Cap how much of the budget reasoning may consume so the
+            # remainder is reserved for the actual answer.
+            attempts.append(
+                {"type": "enabled", "budget_tokens": thinking_budget}
+            )
+        attempts.append({"type": "disabled"})
+        attempts.append(None)
 
-            # First try with a capped thinking budget. Fall back to no
-            # thinking config if that response has no text block (thinking
-            # crowded out the answer) or if the API rejects the parameter
-            # at all — either way, the request still gets answered.
+        diagnostics = ""
+        last_error: ProviderError | None = None
+        for config in attempts:
+            if config is None:
+                kwargs.pop("thinking", None)
+            else:
+                kwargs["thinking"] = config
             try:
-                text = self._request_text(client, kwargs)
-                if text is not None:
-                    return text
-            except ProviderError:
-                pass
+                text, diagnostics = self._request_text(client, kwargs)
+            except ProviderError as e:
+                last_error = e
+                continue
+            if text is not None:
+                return text
 
-            kwargs.pop("thinking")
-
-        text = self._request_text(client, kwargs)
-        if text is not None:
-            return text
-
+        if last_error is not None:
+            raise last_error
         raise ProviderError(
-            f"Anthropic returned no text block (model: {self.model})"
+            f"Anthropic returned no text block (model: {self.model}, "
+            f"{diagnostics})"
         )
 
-    def _request_text(self, client, kwargs: dict) -> str | None:
-        """Make one request; return its text block, or None if it has none."""
+    def _request_text(self, client, kwargs: dict) -> tuple[str | None, str]:
+        """Make one request.
+
+        Returns (text, diagnostics) where text is the response's text block
+        or None if it has none, and diagnostics summarizes why — stop reason
+        and token usage make a missing text block self-explanatory.
+        """
         try:
             resp = client.messages.create(**kwargs)
         except Exception as e:
@@ -189,8 +234,9 @@ class AnthropicProvider(LLMProvider):
         # non-text block) before the actual text block — find the text one.
         for block in resp.content:
             if getattr(block, "type", None) == "text":
-                return block.text
-        return None
+                return block.text, ""
+
+        return None, _describe_response(resp)
 
     def is_available(self) -> bool:
         return bool(self.api_key)
@@ -219,8 +265,9 @@ class OpenAIProvider(LLMProvider):
 
     def chat(
         self, prompt: str, system: str = "", max_tokens: int = 0,
-        image: ImageInput | None = None,
+        image: ImageInput | None = None, thinking: bool = True,
     ) -> str:
+        """`thinking` is ignored — no extended-thinking control on this API."""
         client = self._get_client()
         messages = []
         if system:

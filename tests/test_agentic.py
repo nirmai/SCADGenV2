@@ -30,10 +30,13 @@ class MockProvider(LLMProvider):
         self._call_idx = 0
         self.calls: list[tuple[str, str]] = []
         self.max_tokens_seen: list[int] = []
+        self.thinking_seen: list[bool] = []
 
-    def chat(self, prompt: str, system: str = "", max_tokens: int = 0, image=None) -> str:
+    def chat(self, prompt: str, system: str = "", max_tokens: int = 0,
+             image=None, thinking: bool = True) -> str:
         self.calls.append((prompt, system))
         self.max_tokens_seen.append(max_tokens)
+        self.thinking_seen.append(thinking)
         if self._call_idx < len(self._responses):
             resp = self._responses[self._call_idx]
             self._call_idx += 1
@@ -167,6 +170,15 @@ class TestDecomposer(unittest.TestCase):
         self.assertEqual(len(provider.calls), 1)
         _, system = provider.calls[0]
         self.assertIn("assembly planner", system.lower())
+
+    def test_decompose_disables_thinking(self):
+        """Regression: extended reasoning competed with the JSON for the token
+        budget, so complex prompts came back truncated or with no text block.
+        Decomposition emits structured JSON and doesn't need it."""
+        provider = MockProvider([DECOMPOSE_RESPONSE])
+        decomposer = AssemblyDecomposer(provider, self.engine.registry)
+        decomposer.decompose("a 4-cylinder engine")
+        self.assertFalse(provider.thinking_seen[0])
 
     def test_decompose_requests_generous_token_budget(self):
         """Regression: extended-thinking models can burn a small token budget
@@ -349,6 +361,22 @@ class TestGenerationAttemptTracking(unittest.TestCase):
             gen.generate_missing(plan)
             self.assertEqual(gen.attempts_used.get("test_widget"), 1)
 
+    def test_generation_keeps_thinking_enabled(self):
+        """Unlike decomposition, writing novel geometry benefits from
+        reasoning — it should not be disabled here."""
+        from scadgen.agentic.template_generator import TemplateGenerator
+
+        plan = AssemblyPlan(
+            name="t", description="", root_part="w",
+            parts=[PartSpec("w", "a widget", "test_widget", custom=True)],
+            templates_needed=["test_widget"],
+        )
+        provider = MockProvider([VALID_TEMPLATE])
+        with tempfile.TemporaryDirectory() as d:
+            gen = TemplateGenerator(provider, SCADEngine().registry, Path(d))
+            gen.generate_missing(plan)
+            self.assertTrue(all(provider.thinking_seen))
+
     def test_repair_round_records_two_attempts(self):
         from scadgen.agentic.template_generator import TemplateGenerator
 
@@ -438,6 +466,8 @@ class TestConnectionPlanner(unittest.TestCase):
         self.assertEqual(len(provider.calls), 1)
         self.assertEqual(result.connections[0].from_connector, "deck_face")
         self.assertGreaterEqual(provider.max_tokens_seen[0], 8192)
+        # Structured JSON, same as decomposition — no extended reasoning.
+        self.assertFalse(provider.thinking_seen[0])
 
     def test_auto_snap_single_connector_no_llm(self):
         """A bad reference to a part with exactly one connector snaps to it
@@ -949,7 +979,74 @@ class TestAnthropicProvider(unittest.TestCase):
         self.assertEqual(p.chat("hi", max_tokens=8192), "recovered")
         self.assertEqual(len(calls), 2)
         self.assertEqual(calls[0]["type"], "enabled")
-        self.assertIsNone(calls[1])
+        # Must be explicitly disabled — omitting the parameter lets the API
+        # apply its default, which is thinking-ON.
+        self.assertEqual(calls[1]["type"], "disabled")
+
+    def test_no_text_block_error_includes_diagnostics(self):
+        """A missing text block should be self-diagnosing: stop_reason tells
+        you whether it was truncation, thinking_tokens how much reasoning
+        consumed. Without these, debugging is guesswork."""
+        from scadgen.exceptions import ProviderError
+        from scadgen.nlp.providers import AnthropicProvider
+
+        class ThinkingBlock:
+            type = "thinking"
+
+        class Details:
+            thinking_tokens = 7777
+
+        class Usage:
+            output_tokens = 8192
+            output_tokens_details = Details()
+
+        class FakeResponse:
+            content = [ThinkingBlock()]
+            stop_reason = "max_tokens"
+            usage = Usage()
+
+        class FakeMessages:
+            def create(self, **kwargs):
+                return FakeResponse()
+
+        class FakeClient:
+            messages = FakeMessages()
+
+        p = AnthropicProvider(api_key="k")
+        p._client = FakeClient()
+
+        with self.assertRaises(ProviderError) as ctx:
+            p.chat("hi", max_tokens=8192)
+        msg = str(ctx.exception)
+        self.assertIn("max_tokens", msg)
+        self.assertIn("7777", msg)
+        self.assertIn("thinking", msg)
+
+    def test_chat_disables_thinking_when_requested(self):
+        from scadgen.nlp.providers import AnthropicProvider
+
+        seen = {}
+
+        class TextBlock:
+            type = "text"
+            text = "ok"
+
+        class FakeResponse:
+            content = [TextBlock()]
+
+        class FakeMessages:
+            def create(self, **kwargs):
+                seen.update(kwargs)
+                return FakeResponse()
+
+        class FakeClient:
+            messages = FakeMessages()
+
+        p = AnthropicProvider(api_key="k")
+        p._client = FakeClient()
+        p.chat("hi", max_tokens=8192, thinking=False)
+
+        self.assertEqual(seen["thinking"]["type"], "disabled")
 
     def test_chat_recovers_if_thinking_param_is_rejected(self):
         """If the API rejects the thinking parameter outright, fall back to a
@@ -979,7 +1076,9 @@ class TestAnthropicProvider(unittest.TestCase):
         p._client = FakeClient()
 
         self.assertEqual(p.chat("hi", max_tokens=8192), "plain ok")
-        self.assertEqual(len(calls), 2)
+        # Escalates: enabled -> disabled -> parameter omitted entirely, which
+        # is the only rung a model that doesn't know `thinking` will accept.
+        self.assertIsNone(calls[-1])
 
 
 # ── Vision / image input tests ───────────────────────────────────────────
@@ -1020,9 +1119,10 @@ class TestImageInput(unittest.TestCase):
                 super().__init__([DECOMPOSE_RESPONSE])
                 self.image_seen = None
 
-            def chat(self, prompt, system="", max_tokens=0, image=None):
+            def chat(self, prompt, system="", max_tokens=0, image=None,
+                     thinking=True):
                 self.image_seen = image
-                return super().chat(prompt, system, max_tokens)
+                return super().chat(prompt, system, max_tokens, image, thinking)
 
         engine = SCADEngine()
         provider = VisionMock()

@@ -24,10 +24,13 @@ class AssemblyDecomposer:
         system, user = build_decomposition_prompt(
             description, templates, has_image=image is not None,
         )
-        # Extended-thinking models can spend a large share of a small token
-        # budget on invisible reasoning, leaving too little room for the
-        # actual JSON — leave generous headroom.
-        raw = self._provider.chat(user, system=system, image=image, max_tokens=8192)
+        # Thinking off: this step emits structured JSON chosen from a
+        # template catalog, which gains little from extended reasoning while
+        # those tokens compete with the answer for the budget — complex
+        # prompts were coming back truncated or with no text at all.
+        raw = self._provider.chat(
+            user, system=system, image=image, max_tokens=8192, thinking=False,
+        )
 
         try:
             data = parse_json_response(raw)
