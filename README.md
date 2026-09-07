@@ -9,7 +9,7 @@ SCADGen is an AI-powered CAD generator. Describe an object in plain English — 
 **The template library grows with use** — ask for something it doesn't have (a birdcage, a spoked wheel) and it gets generated, OpenSCAD-verified, and kept for next time.
 
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
-![Tests](https://img.shields.io/badge/tests-375%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-386%20passing-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![OpenSCAD](https://img.shields.io/badge/output-OpenSCAD-orange.svg)
 
@@ -150,7 +150,7 @@ scadgen/
 └── templates/    # 28 parametric .scad templates with metadata
 ```
 
-- **~6,300 lines of Python**, **375 tests**
+- **~6,500 lines of Python**, **386 tests**
 - Templates are plain `.scad` files with a `SCADGEN_META` YAML header — add a new part by dropping in a file; no code changes
 - LLM-agnostic: swap providers via config or `--provider`
 
@@ -159,6 +159,8 @@ scadgen/
 ## Current status & roadmap
 
 SCADGen has a **robust, working pipeline** — it reliably produces valid, correctly-positioned assemblies and never crashes on bad model output, and its template library compounds over time rather than staying fixed (see "Template library" above). The generated-templates cache lives in `generated_templates/` (`SCADGEN_GENERATED_DIR`-overridable); `scadgen clear-generated` resets it.
+
+**Measured, not just claimed:** [`scripts/benchmark.py`](scripts/benchmark.py) runs a fixed set of prompts — some using the existing library, some forcing brand-new geometry — against Claude. Across 3 independent runs (18 assemblies total), every one succeeded, including two categories that were failing outright earlier the same day until a token-budget fix landed. Generated templates (9 across those runs) mostly passed OpenSCAD verification within one or two attempts — though take that fidelity number with a grain of salt: the generation prompt includes worked examples for cage/dome/ring-style geometry (the project's original proving case), so results on that specific shape family are somewhat inflated versus a truly unseen object. A couple of unrelated novel shapes (a tripod mount, a wall hook) passed just as cleanly, which is better evidence of real generalization than the headline number alone.
 
 Known limitations, honestly:
 
