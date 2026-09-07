@@ -874,6 +874,113 @@ class TestAnthropicProvider(unittest.TestCase):
         with self.assertRaises(ProviderError):
             p.chat("hi")
 
+    def test_thinking_budget_leaves_room_for_the_answer(self):
+        """budget_tokens must be >=1024 and strictly < max_tokens, so some of
+        the budget is always reserved for the actual response."""
+        from scadgen.nlp.providers import _thinking_budget
+
+        for max_tokens in (2048, 4096, 8192, 32000):
+            budget = _thinking_budget(max_tokens)
+            self.assertGreaterEqual(budget, 1024)
+            self.assertLess(budget, max_tokens)
+
+        # Too small to satisfy both constraints -> no thinking config sent.
+        self.assertEqual(_thinking_budget(1024), 0)
+        self.assertEqual(_thinking_budget(512), 0)
+
+    def test_chat_sends_capped_thinking_budget(self):
+        from scadgen.nlp.providers import AnthropicProvider
+
+        seen = {}
+
+        class FakeBlock:
+            type = "text"
+            text = "ok"
+
+        class FakeResponse:
+            content = [FakeBlock()]
+
+        class FakeMessages:
+            def create(self, **kwargs):
+                seen.update(kwargs)
+                return FakeResponse()
+
+        class FakeClient:
+            messages = FakeMessages()
+
+        p = AnthropicProvider(api_key="k")
+        p._client = FakeClient()
+        p.chat("hi", max_tokens=8192)
+
+        self.assertEqual(seen["thinking"]["type"], "enabled")
+        self.assertLess(seen["thinking"]["budget_tokens"], seen["max_tokens"])
+
+    def test_chat_retries_without_thinking_when_no_text(self):
+        """Regression: a model can spend its whole budget thinking and return
+        no text block. Retry once without thinking rather than failing."""
+        from scadgen.nlp.providers import AnthropicProvider
+
+        calls = []
+
+        class ThinkingBlock:
+            type = "thinking"
+
+        class TextBlock:
+            type = "text"
+            text = "recovered"
+
+        class FakeResponse:
+            def __init__(self, content):
+                self.content = content
+
+        class FakeMessages:
+            def create(self, **kwargs):
+                calls.append(kwargs.get("thinking"))
+                if len(calls) == 1:
+                    return FakeResponse([ThinkingBlock()])
+                return FakeResponse([TextBlock()])
+
+        class FakeClient:
+            messages = FakeMessages()
+
+        p = AnthropicProvider(api_key="k")
+        p._client = FakeClient()
+
+        self.assertEqual(p.chat("hi", max_tokens=8192), "recovered")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0]["type"], "enabled")
+        self.assertIsNone(calls[1])
+
+    def test_chat_recovers_if_thinking_param_is_rejected(self):
+        """If the API rejects the thinking parameter outright, fall back to a
+        plain request rather than breaking every call."""
+        from scadgen.nlp.providers import AnthropicProvider
+
+        calls = []
+
+        class TextBlock:
+            type = "text"
+            text = "plain ok"
+
+        class FakeResponse:
+            content = [TextBlock()]
+
+        class FakeMessages:
+            def create(self, **kwargs):
+                calls.append(kwargs.get("thinking"))
+                if "thinking" in kwargs:
+                    raise ValueError("unexpected parameter: thinking")
+                return FakeResponse()
+
+        class FakeClient:
+            messages = FakeMessages()
+
+        p = AnthropicProvider(api_key="k")
+        p._client = FakeClient()
+
+        self.assertEqual(p.chat("hi", max_tokens=8192), "plain ok")
+        self.assertEqual(len(calls), 2)
+
 
 # ── Vision / image input tests ───────────────────────────────────────────
 

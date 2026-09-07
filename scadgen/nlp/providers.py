@@ -100,6 +100,19 @@ class OllamaProvider(LLMProvider):
             return False
 
 
+def _thinking_budget(max_tokens: int) -> int:
+    """Tokens to allow extended thinking, reserving the rest for the answer.
+
+    The API requires budget_tokens >= 1024 and strictly < max_tokens. When
+    the budget is too small to satisfy both, return 0 so no thinking config
+    is sent and the API default applies.
+    """
+    half = max_tokens // 2
+    if half < 1024 or max_tokens <= 1024:
+        return 0
+    return min(half, max_tokens - 1024)
+
+
 class AnthropicProvider(LLMProvider):
     def __init__(self, api_key: str, model: str = "claude-sonnet-5"):
         self.api_key = api_key
@@ -127,14 +140,46 @@ class AnthropicProvider(LLMProvider):
         else:
             content = prompt
 
+        budget = max_tokens or 4096
         kwargs: dict = {
             "model": self.model,
-            "max_tokens": max_tokens or 4096,
+            "max_tokens": budget,
             "messages": [{"role": "user", "content": content}],
         }
         if system:
             kwargs["system"] = system
 
+        # Cap how much of the budget extended thinking may consume, so the
+        # remainder is reserved for the actual answer. Without this, a model
+        # can spend the whole budget reasoning and return a response with no
+        # text block at all (observed live on complex prompts).
+        thinking_budget = _thinking_budget(budget)
+        if thinking_budget:
+            kwargs["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
+
+            # First try with a capped thinking budget. Fall back to no
+            # thinking config if that response has no text block (thinking
+            # crowded out the answer) or if the API rejects the parameter
+            # at all — either way, the request still gets answered.
+            try:
+                text = self._request_text(client, kwargs)
+                if text is not None:
+                    return text
+            except ProviderError:
+                pass
+
+            kwargs.pop("thinking")
+
+        text = self._request_text(client, kwargs)
+        if text is not None:
+            return text
+
+        raise ProviderError(
+            f"Anthropic returned no text block (model: {self.model})"
+        )
+
+    def _request_text(self, client, kwargs: dict) -> str | None:
+        """Make one request; return its text block, or None if it has none."""
         try:
             resp = client.messages.create(**kwargs)
         except Exception as e:
@@ -145,10 +190,7 @@ class AnthropicProvider(LLMProvider):
         for block in resp.content:
             if getattr(block, "type", None) == "text":
                 return block.text
-        raise ProviderError(
-            "Anthropic response contained no text block "
-            f"(block types: {[getattr(b, 'type', '?') for b in resp.content]})"
-        )
+        return None
 
     def is_available(self) -> bool:
         return bool(self.api_key)
