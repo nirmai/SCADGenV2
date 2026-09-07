@@ -44,6 +44,8 @@ class TemplateGenerator:
         """
         created: list[str] = []
         self.failures: list[tuple[str, str]] = []
+        # template_id -> attempts needed to pass (1 = first try).
+        self.attempts_used: dict[str, int] = {}
         still_needed: list[str] = []
 
         for tid in plan.templates_needed:
@@ -76,6 +78,7 @@ class TemplateGenerator:
             if not errors:
                 errors = self._render_errors(code)
             if not errors:
+                self.attempts_used[part.suggested_template] = attempt + 1
                 return self._save_and_register(part.suggested_template, code)
 
             last_errors = errors

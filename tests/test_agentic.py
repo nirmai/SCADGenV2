@@ -318,6 +318,42 @@ class TestTemplateValidator(unittest.TestCase):
         self.assertTrue(any("no geometry" in e.lower() for e in errors))
 
 
+# ── Template generator attempt tracking ──────────────────────────────────
+
+
+class TestGenerationAttemptTracking(unittest.TestCase):
+    def test_first_try_success_records_one_attempt(self):
+        from scadgen.agentic.template_generator import TemplateGenerator
+
+        plan = AssemblyPlan(
+            name="t", description="", root_part="w",
+            parts=[PartSpec("w", "a widget", "test_widget", custom=True)],
+            templates_needed=["test_widget"],
+        )
+        provider = MockProvider([VALID_TEMPLATE])
+        with tempfile.TemporaryDirectory() as d:
+            gen = TemplateGenerator(provider, SCADEngine().registry, Path(d))
+            gen.generate_missing(plan)
+            self.assertEqual(gen.attempts_used.get("test_widget"), 1)
+
+    def test_repair_round_records_two_attempts(self):
+        from scadgen.agentic.template_generator import TemplateGenerator
+
+        broken = VALID_TEMPLATE.replace(
+            "cube([width, width, height], center=true);", "x = width;",
+        )
+        plan = AssemblyPlan(
+            name="t", description="", root_part="w",
+            parts=[PartSpec("w", "a widget", "test_widget", custom=True)],
+            templates_needed=["test_widget"],
+        )
+        provider = MockProvider([broken, VALID_TEMPLATE])
+        with tempfile.TemporaryDirectory() as d:
+            gen = TemplateGenerator(provider, SCADEngine().registry, Path(d))
+            gen.generate_missing(plan)
+            self.assertEqual(gen.attempts_used.get("test_widget"), 2)
+
+
 # ── Registry register_template tests ────────────────────────────────────
 
 

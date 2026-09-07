@@ -49,5 +49,8 @@ class AssemblyResult:
     output_path: str
     plan: AssemblyPlan
     generated_templates: list[str] = field(default_factory=list)
+    # template_id -> number of generation attempts needed to pass validation
+    # and the OpenSCAD render-check (1 = passed first try).
+    generated_attempts: dict[str, int] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     success: bool = True

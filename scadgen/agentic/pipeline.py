@@ -82,6 +82,7 @@ def run_pipeline(
         )
 
     generated_paths: list[str] = []
+    generated_attempts: dict[str, int] = {}
     warnings: list[str] = []
     if plan.templates_needed:
         _log(verbose, "[3/5] Generating missing templates")
@@ -107,6 +108,7 @@ def run_pipeline(
             openscad_bin=openscad_bin,
         )
         generated_paths = generator.generate_missing(plan)
+        generated_attempts = generator.attempts_used
         for p in generated_paths:
             _log(verbose, f"  -> Created: {p}")
         for tid, err in generator.failures:
@@ -162,6 +164,7 @@ def run_pipeline(
     executor = AssemblyExecutor(engine)
     result = executor.execute(plan, output_path=output_path, output_dir=output_dir)
     result.generated_templates = generated_paths
+    result.generated_attempts = generated_attempts
     result.warnings.extend(warnings)
     _log(verbose, f"  -> Output: {result.output_path}")
     _log(verbose, f"  -> {len(result.scad_code)} bytes")
