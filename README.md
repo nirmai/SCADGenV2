@@ -96,6 +96,16 @@ These 28 ship with the repo. Anything the library doesn't have gets written by t
 
 ---
 
+## Requirements
+
+- **Python 3.10+**
+- **An LLM provider** — at least one of:
+  - [Ollama](https://ollama.com/) running locally (free, no API key, auto-detected), or
+  - an Anthropic or OpenAI API key (install the SDK with `pip install -e ".[anthropic]"` or `".[openai]"`, then set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`)
+- **[OpenSCAD](https://openscad.org/downloads.html)** — only required when an assembly needs a brand-new template generated, i.e. you ask for something the library doesn't already have. Not needed to run `generate`/`assemble` against existing templates, but you'll want it installed anyway to actually render the `.scad` output. If it's not on your `PATH`, point `OPENSCAD_PATH` at the executable. A recent build with the **Manifold** backend enabled (Preferences → Features) renders generated geometry dramatically faster than the older default backend — worth it if you plan to generate novel parts often.
+
+---
+
 ## Quickstart
 
 ```bash
@@ -103,8 +113,9 @@ These 28 ship with the repo. Anything the library doesn't have gets written by t
 pip install -e .
 
 # set up an LLM provider (any one):
-#   • local:  run Ollama (auto-detected)
-#   • cloud:  export ANTHROPIC_API_KEY=...   or   OPENAI_API_KEY=...
+#   • local:  run Ollama (auto-detected, no extra install)
+#   • cloud:  pip install -e ".[anthropic]"   (or ".[openai]")
+#             export ANTHROPIC_API_KEY=...    (or OPENAI_API_KEY=...)
 
 # generate a single part
 scadgen generate "M8 hex bolt 40mm long" -o bolt.scad
