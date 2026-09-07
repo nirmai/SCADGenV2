@@ -162,7 +162,7 @@ SCADGen has a **robust, working pipeline** — it reliably produces valid, corre
 
 **Measured, not just claimed:** [`scripts/benchmark.py`](scripts/benchmark.py) runs a fixed set of prompts — some using the existing library, some forcing brand-new geometry — against Claude. Across 3 independent runs (18 assemblies total), every one succeeded, including two categories that were failing outright earlier the same day until a token-budget fix landed. Generated templates (9 across those runs) mostly passed OpenSCAD verification within one or two attempts — though take that fidelity number with a grain of salt: the generation prompt includes worked examples for cage/dome/ring-style geometry (the project's original proving case), so results on that specific shape family are somewhat inflated versus a truly unseen object. A couple of unrelated novel shapes (a tripod mount, a wall hook) passed just as cleanly, which is better evidence of real generalization than the headline number alone.
 
-Known limitations, honestly:
+Known limitations:
 
 - **Generation fidelity varies with model capability** — a frontier model (Claude, GPT-4o) reliably produces real, structured geometry for novel parts; smaller local models tend to fall back to plain primitives instead of using the pattern/custom-generation machinery
 - **No feedback loop** — the system verifies that generated geometry *renders*, but doesn't yet look at *what* it rendered to critique and improve it
