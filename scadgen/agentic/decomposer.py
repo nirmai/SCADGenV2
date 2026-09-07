@@ -24,7 +24,10 @@ class AssemblyDecomposer:
         system, user = build_decomposition_prompt(
             description, templates, has_image=image is not None,
         )
-        raw = self._provider.chat(user, system=system, image=image)
+        # Extended-thinking models can spend a large share of a small token
+        # budget on invisible reasoning, leaving too little room for the
+        # actual JSON — leave generous headroom.
+        raw = self._provider.chat(user, system=system, image=image, max_tokens=8192)
 
         try:
             data = parse_json_response(raw)

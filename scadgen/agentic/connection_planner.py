@@ -98,7 +98,7 @@ class ConnectionPlanner:
             plan, mismatches, template_connectors,
         )
         try:
-            raw = self._provider.chat(user, system=system)
+            raw = self._provider.chat(user, system=system, max_tokens=8192)
             data = parse_json_response(raw)
         except Exception:
             return

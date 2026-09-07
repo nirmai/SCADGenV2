@@ -29,9 +29,11 @@ class MockProvider(LLMProvider):
         self._responses = list(responses or [])
         self._call_idx = 0
         self.calls: list[tuple[str, str]] = []
+        self.max_tokens_seen: list[int] = []
 
     def chat(self, prompt: str, system: str = "", max_tokens: int = 0, image=None) -> str:
         self.calls.append((prompt, system))
+        self.max_tokens_seen.append(max_tokens)
         if self._call_idx < len(self._responses):
             resp = self._responses[self._call_idx]
             self._call_idx += 1
@@ -165,6 +167,17 @@ class TestDecomposer(unittest.TestCase):
         self.assertEqual(len(provider.calls), 1)
         _, system = provider.calls[0]
         self.assertIn("assembly planner", system.lower())
+
+    def test_decompose_requests_generous_token_budget(self):
+        """Regression: extended-thinking models can burn a small token budget
+        on invisible reasoning before emitting any JSON, truncating or
+        blanking the response (observed live: 'no text block' and truncated
+        JSON on more complex prompts). Decomposition must request enough
+        headroom, matching what template generation already uses."""
+        provider = MockProvider([DECOMPOSE_RESPONSE])
+        decomposer = AssemblyDecomposer(provider, self.engine.registry)
+        decomposer.decompose("a 4-cylinder engine")
+        self.assertGreaterEqual(provider.max_tokens_seen[0], 8192)
 
 
 # ── Inventory tests ──────────────────────────────────────────────────────
@@ -424,6 +437,7 @@ class TestConnectionPlanner(unittest.TestCase):
 
         self.assertEqual(len(provider.calls), 1)
         self.assertEqual(result.connections[0].from_connector, "deck_face")
+        self.assertGreaterEqual(provider.max_tokens_seen[0], 8192)
 
     def test_auto_snap_single_connector_no_llm(self):
         """A bad reference to a part with exactly one connector snaps to it
